@@ -14,10 +14,28 @@ import * as Contracts from ".";
 declare module "hardhat/types/runtime" {
   interface HardhatEthersHelpers extends HardhatEthersHelpersBase {
     getContractFactory(
+      name: "CertificateContract",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.CertificateContract__factory>;
+    getContractFactory(
+      name: "CertificateContract",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.CertificateContract__factory>;
+    getContractFactory(
       name: "Counter",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.Counter__factory>;
 
+    getContractAt(
+      name: "CertificateContract",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.CertificateContract>;
+    getContractAt(
+      name: "CertificateContract",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.CertificateContract>;
     getContractAt(
       name: "Counter",
       address: string | ethers.Addressable,
@@ -25,10 +43,28 @@ declare module "hardhat/types/runtime" {
     ): Promise<Contracts.Counter>;
 
     deployContract(
+      name: "CertificateContract",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.CertificateContract>;
+    deployContract(
+      name: "CertificateContract",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.CertificateContract>;
+    deployContract(
       name: "Counter",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.Counter>;
 
+    deployContract(
+      name: "CertificateContract",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.CertificateContract>;
+    deployContract(
+      name: "CertificateContract",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.CertificateContract>;
     deployContract(
       name: "Counter",
       args: any[],

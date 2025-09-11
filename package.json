@@ -10,7 +10,11 @@
     "preview": "vite preview",
     "hardhat:compile": "tsc --project hardhat.tsconfig.json && hardhat compile",
     "hardhat:test": "tsc --project hardhat.tsconfig.json && hardhat test",
-    "deploy:ganache": "tsc --project hardhat.tsconfig.json && hardhat run scripts/deploy.ts --network ganache"
+    "deploy:ganache": "tsc --project hardhat.tsconfig.json && hardhat run scripts/deploy.ts --network ganache",
+    "deploy:certificate:ganache": "hardhat run scripts/deploy-certificate.ts --network ganache",
+    "deploy:certificate:sepolia": "hardhat run scripts/deploy-certificate.ts --network sepolia",
+    "compile": "hardhat compile",
+    "test": "hardhat test"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

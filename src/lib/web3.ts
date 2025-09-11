@@ -2,50 +2,326 @@ import { ethers } from 'ethers';
 
 const INFURA_API_KEY = import.meta.env.VITE_INFURA_API_KEY;
 
-// Contract configuration - Updated with deployed Counter contract
-export const CONTRACT_ADDRESS = '0xE3846395266Bd89bab1Afa1CDE2e83A398dfe96D';
+// Replace these in your src/lib/web3.ts file after deployment:
+
+export const CONTRACT_ADDRESS = '0xE3846395266Bd89bab1Afa1CDE2e83A398dfe96D'; // From deployment output
+
 export const CONTRACT_ABI = [
+  {
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
   {
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
+        "indexed": true,
         "internalType": "uint256",
-        "name": "by",
+        "name": "certificateId",
         "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "course",
+        "type": "string"
       }
     ],
-    "name": "Increment",
+    "name": "CertificateIssued",
     "type": "event"
   },
   {
-    "inputs": [],
-    "name": "inc",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "certificateId",
+        "type": "uint256"
+      }
+    ],
+    "name": "CertificateRevoked",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "certificates",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "course",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "institution",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "dateIssued",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "isValid",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "by",
+        "name": "_certificateId",
         "type": "uint256"
       }
     ],
-    "name": "incBy",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "name": "getCertificate",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "id",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "recipient",
+            "type": "address"
+          },
+          {
+            "internalType": "string",
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "course",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "institution",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "dateIssued",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "isValid",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct CertificateContract.Certificate",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_recipient",
+        "type": "address"
+      }
+    ],
+    "name": "getRecipientCertificates",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [],
-    "name": "x",
+    "name": "getTotalCertificates",
     "outputs": [
       {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "_name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "_course",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "_institution",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_dateIssued",
+        "type": "uint256"
+      }
+    ],
+    "name": "issueCertificate",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nextCertificateId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "recipientCertificates",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_certificateId",
+        "type": "uint256"
+      }
+    ],
+    "name": "revokeCertificate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_certificateId",
+        "type": "uint256"
+      }
+    ],
+    "name": "verifyCertificate",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -126,7 +402,7 @@ export const checkNetwork = async (provider: ethers.BrowserProvider): Promise<bo
 
 export const connectWallet = async (): Promise<Web3State> => {
   try {
-    const provider = await getWeb3Provider();
+    let provider = await getWeb3Provider();
     if (!provider) {
       throw new Error('MetaMask not detected. Please install MetaMask extension.');
     }
@@ -140,46 +416,99 @@ export const connectWallet = async (): Promise<Web3State> => {
     // Check if already connected
     const accounts = await window.ethereum!.request({ method: 'eth_accounts' });
     if (accounts.length === 0) {
-      // Request account access if not connected
       await window.ethereum!.request({ method: 'eth_requestAccounts' });
     }
 
-    // Check if on correct network
-    const isCorrectNetwork = await checkNetwork(provider);
+    // Simple network check function using direct MetaMask call
+    const checkCurrentNetwork = async (): Promise<boolean> => {
+      try {
+        if (!window.ethereum) return false;
+        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+        const expectedChainId = CURRENT_NETWORK_CONFIG.chainId;
+        console.log(`Network check - Expected: ${expectedChainId}, Actual: ${chainId}`);
+        return chainId === expectedChainId;
+      } catch (error) {
+        console.error('Network check failed:', error);
+        return false;
+      }
+    };
+
+    // Initial network check
+    let isCorrectNetwork = await checkCurrentNetwork();
+    
     if (!isCorrectNetwork) {
+      console.log('Wrong network detected, switching...');
+      
       if (USE_GANACHE) {
         await switchToGanache();
       } else {
         await switchToSepolia();
       }
-      // Re-check after switching
-      const stillCorrectNetwork = await checkNetwork(provider);
-      if (!stillCorrectNetwork) {
-        const networkName = USE_GANACHE ? 'Ganache Local' : 'Sepolia testnet';
-        throw new Error(`Please switch to ${networkName} in MetaMask`);
+
+      // Wait for network switch to complete
+      console.log('Waiting for network switch to complete...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Check network again after switch
+      isCorrectNetwork = await checkCurrentNetwork();
+      
+      if (!isCorrectNetwork) {
+        // One more retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        isCorrectNetwork = await checkCurrentNetwork();
+        
+        if (!isCorrectNetwork) {
+          const networkName = USE_GANACHE ? 'Ganache Local (Chain ID: 1337)' : 'Sepolia testnet (Chain ID: 11155111)';
+          throw new Error(`Please manually switch to ${networkName} in MetaMask and try again.`);
+        }
       }
     }
-    
+
+    // Create fresh provider instance AFTER network is confirmed correct
+    console.log('Creating fresh provider instance...');
+    provider = new ethers.BrowserProvider(window.ethereum!);
+
+    // Set up event listeners with inline functions to avoid naming conflicts
+    if (window.ethereum) {
+      // Remove all existing listeners first
+      window.ethereum.removeAllListeners?.('chainChanged');
+      window.ethereum.removeAllListeners?.('accountsChanged');
+      
+      // Add new listeners with inline functions
+      window.ethereum.on('chainChanged', () => {
+        console.warn('MetaMask network changed, reloading...');
+        window.location.reload();
+      });
+      
+      window.ethereum.on('accountsChanged', () => {
+        console.warn('MetaMask accounts changed, reloading...');
+        window.location.reload();
+      });
+    }
+
     const signer = await provider.getSigner();
     const account = await signer.getAddress();
-    
-    // Validate that contract address is different from user address
+
     if (CONTRACT_ADDRESS.toLowerCase() === account.toLowerCase()) {
-      throw new Error('Contract address cannot be the same as your wallet address. Please deploy your smart contract and use the correct contract address.');
+      throw new Error('Contract address cannot be the same as your wallet address.');
     }
-    
-    // Create contract instance
+
     const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
-    // Test if Counter contract exists by calling the view function 'x'
+    // Test contract
     try {
       await contract.x();
+      console.log('Contract test successful!');
     } catch (contractError: any) {
+      console.error('Contract test failed:', contractError);
       if (contractError.message?.includes('call exception') || contractError.code === 'CALL_EXCEPTION') {
         const networkName = USE_GANACHE ? 'Ganache' : 'Sepolia testnet';
-        throw new Error(`Counter contract not found at the specified address. Please verify the contract is deployed on ${networkName}.`);
+        throw new Error(`Counter contract not found at address ${CONTRACT_ADDRESS} on ${networkName}.`);
       }
+      throw contractError;
     }
+
+    console.log('Successfully connected to wallet and contract!');
 
     return {
       account,
@@ -190,80 +519,99 @@ export const connectWallet = async (): Promise<Web3State> => {
     };
   } catch (error: any) {
     console.error('Error connecting wallet:', error);
-    
-    // Provide more specific error messages
+
     if (error.code === 4001) {
       throw new Error('Connection rejected by user');
     } else if (error.code === -32002) {
       throw new Error('Connection request already pending. Please check MetaMask.');
-    } else if (error.message?.includes('Unauthorized')) {
-      throw new Error('Network connection failed. Please try switching networks in MetaMask and reconnecting.');
     }
-    
+
     throw error;
   }
 };
 
 export const switchToGanache = async (): Promise<void> => {
-  if (!window.ethereum) {
-    throw new Error('MetaMask not detected');
-  }
+  if (!window.ethereum) throw new Error('MetaMask not detected');
+
+  const expectedChainId = GANACHE_NETWORK_CONFIG.chainId;
 
   try {
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
-      params: [{ chainId: GANACHE_NETWORK_CONFIG.chainId }],
+      params: [{ chainId: expectedChainId }],
     });
   } catch (switchError: any) {
-    // If network doesn't exist, add it
     if (switchError.code === 4902) {
-      try {
-        await window.ethereum.request({
-          method: 'wallet_addEthereumChain',
-          params: [GANACHE_NETWORK_CONFIG],
-        });
-      } catch (addError) {
-        console.error('Error adding Ganache network:', addError);
-        throw new Error('Failed to add Ganache network. Please add it manually in MetaMask.');
-      }
+      // Network not added yet, add it
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [GANACHE_NETWORK_CONFIG],
+      });
     } else if (switchError.code === 4001) {
       throw new Error('Network switch rejected by user');
     } else {
-      console.error('Error switching to Ganache:', switchError);
-      throw new Error('Failed to switch to Ganache network. Please switch manually in MetaMask.');
+      throw new Error('Failed to switch to Ganache network. Please switch manually.');
     }
   }
+
+  // Wait until MetaMask confirms the network switch
+  await new Promise<void>((resolve, reject) => {
+    const networkSwitchHandler = (chainId: string) => {
+      if (chainId === expectedChainId) {
+        window.ethereum?.removeListener('chainChanged', networkSwitchHandler);
+        resolve();
+      }
+    };
+    window.ethereum?.on('chainChanged', networkSwitchHandler);
+
+    // Safety timeout in case chainChanged doesn't fire
+    setTimeout(() => {
+      window.ethereum?.removeListener('chainChanged', networkSwitchHandler);
+      reject(new Error('Network switch timeout. Please switch manually.'));
+    }, 5000);
+  });
 };
 
 export const switchToSepolia = async (): Promise<void> => {
-  if (!window.ethereum) {
-    throw new Error('MetaMask not detected');
-  }
+  if (!window.ethereum) throw new Error('MetaMask not detected');
+
+  const expectedChainId = SEPOLIA_NETWORK_CONFIG.chainId;
 
   try {
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
-      params: [{ chainId: SEPOLIA_NETWORK_CONFIG.chainId }],
+      params: [{ chainId: expectedChainId }],
     });
   } catch (switchError: any) {
-    // If network doesn't exist, add it
     if (switchError.code === 4902) {
-      try {
-        await window.ethereum.request({
-          method: 'wallet_addEthereumChain',
-          params: [SEPOLIA_NETWORK_CONFIG],
-        });
-      } catch (addError) {
-        console.error('Error adding Sepolia network:', addError);
-        throw new Error('Failed to add Sepolia network. Please add it manually in MetaMask.');
-      }
+      // Network not added yet, add it
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [SEPOLIA_NETWORK_CONFIG],
+      });
     } else if (switchError.code === 4001) {
       throw new Error('Network switch rejected by user');
     } else {
-      console.error('Error switching to Sepolia:', switchError);
-      throw new Error('Failed to switch to Sepolia network. Please switch manually in MetaMask.');
+      throw new Error('Failed to switch to Sepolia network. Please switch manually.');
     }
   }
+
+  // Wait until MetaMask confirms the network switch
+  await new Promise<void>((resolve, reject) => {
+    const networkSwitchHandler = (chainId: string) => {
+      if (chainId === expectedChainId) {
+        window.ethereum?.removeListener('chainChanged', networkSwitchHandler);
+        resolve();
+      }
+    };
+    window.ethereum?.on('chainChanged', networkSwitchHandler);
+
+    // Safety timeout
+    setTimeout(() => {
+      window.ethereum?.removeListener('chainChanged', networkSwitchHandler);
+      reject(new Error('Network switch timeout. Please switch manually.'));
+    }, 5000);
+  });
 };
 
 // Utility function to get current network info
@@ -337,6 +685,7 @@ declare global {
       request: (args: { method: string; params?: any[] }) => Promise<any>;
       on: (event: string, handler: (...args: any[]) => void) => void;
       removeListener: (event: string, handler: (...args: any[]) => void) => void;
+      removeAllListeners?: (event: string) => void;
       selectedAddress: string | null;
       isMetaMask?: boolean;
     };
