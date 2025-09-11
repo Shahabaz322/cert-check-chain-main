@@ -1,82 +1,97 @@
 import { ethers } from "hardhat";
+import fs from "fs";
+import path from "path";
 
 async function main() {
-  console.log("🚀 Deploying CertificateContract...");
-
-  // Get the ContractFactory
-  const CertificateContract = await ethers.getContractFactory("CertificateContract");
-
-  // Deploy the contract
-  console.log("📄 Deploying contract...");
-  const certificate = await CertificateContract.deploy();
-
-  // Wait for deployment to be mined
-  await certificate.waitForDeployment();
-
-  const contractAddress = await certificate.getAddress();
-  
-  console.log("✅ CertificateContract deployed successfully!");
-  console.log("📍 Contract Address:", contractAddress);
-  console.log("🔗 Deployment transaction:", certificate.deploymentTransaction()?.hash);
-
-  // Verify deployment by calling contract functions
-  console.log("\n🔍 Verifying deployment...");
-  const owner = await certificate.owner();
-  console.log("👤 Contract owner:", owner);
-  
-  const totalCertificates = await certificate.getTotalCertificates();
-  console.log("📊 Total certificates:", Number(totalCertificates));
-  
-  const nextId = await certificate.nextCertificateId();
-  console.log("🆔 Next certificate ID:", Number(nextId));
-
-  // Generate ABI for frontend
-  const artifact = await ethers.getContractFactory("CertificateContract");
-  
-  console.log("\n🔧 UPDATE YOUR src/lib/web3.ts:");
-  console.log("=" .repeat(50));
-  console.log(`export const CONTRACT_ADDRESS = '${contractAddress}';`);
-  console.log("\nReplace CONTRACT_ABI with:");
-  console.log("export const CONTRACT_ABI = ", JSON.stringify(artifact.interface.formatJson(), null, 2));
-  console.log("=" .repeat(50));
-
-  // Test issuing a certificate (optional)
-  console.log("\n🧪 Testing certificate issuance...");
   try {
-    const testRecipient = owner; // Use deployer as test recipient
-    const testTx = await certificate.issueCertificate(
-      testRecipient,
-      "John Doe",
-      "Blockchain Development",
-      "Tech University",
-      Math.floor(Date.now() / 1000)
+    console.log("🚀 Deploying CertificateContract...");
+    
+    // Deploy the contract
+    const CertificateContract = await ethers.getContractFactory("CertificateContract");
+    const certificate = await CertificateContract.deploy();
+    
+    // Wait for deployment to complete
+    await certificate.waitForDeployment();
+    
+    // Get contract address
+    const contractAddress = await certificate.getAddress();
+    
+    console.log("✅ CertificateContract deployed successfully!");
+    console.log("📍 Contract Address:", contractAddress);
+    
+    // Verify address is valid
+    if (!contractAddress || contractAddress === "0x0000000000000000000000000000000000000000") {
+      throw new Error("Invalid contract address received");
+    }
+    
+    // Get ABI from artifacts - fix path resolution
+    const artifactPath = path.join(__dirname, "..", "artifacts", "contracts", "CertificateContract.sol", "CertificateContract.json");
+    
+    // Check if artifact file exists
+    if (!fs.existsSync(artifactPath)) {
+      throw new Error(`Artifact file not found at: ${artifactPath}`);
+    }
+    
+    console.log("📁 Reading artifact from:", artifactPath);
+    
+    const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
+    
+    // Verify ABI exists
+    if (!artifact.abi) {
+      throw new Error("ABI not found in artifact");
+    }
+    
+    console.log("📋 ABI loaded successfully, methods count:", artifact.abi.length);
+    
+    // Ensure frontend directory exists
+    const frontendDir = path.join(__dirname, "..", "src", "lib");
+    if (!fs.existsSync(frontendDir)) {
+      console.log("📁 Creating frontend directory:", frontendDir);
+      fs.mkdirSync(frontendDir, { recursive: true });
+    }
+    
+    // Save ABI + address for frontend
+    const configPath = path.join(frontendDir, "contract-config.json");
+    const contractConfig = {
+      address: contractAddress,
+      abi: artifact.abi,
+      deploymentTimestamp: new Date().toISOString(),
+      network: (await ethers.provider.getNetwork()).name
+    };
+    
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(contractConfig, null, 2)
     );
     
-    const receipt = await testTx.wait();
-    console.log("✅ Test certificate issued! TX hash:", receipt?.hash);
+    console.log("\n🔧 Contract config saved to:", configPath);
+    console.log("📄 Config contents preview:");
+    console.log(`   - Address: ${contractConfig.address}`);
+    console.log(`   - ABI methods: ${contractConfig.abi.length}`);
+    console.log(`   - Network: ${contractConfig.network}`);
     
-    // Get the certificate
-    const testCert = await certificate.getCertificate(1);
-    console.log("📜 Test certificate details:", {
-      id: Number(testCert.id),
-      recipient: testCert.recipient,
-      name: testCert.name,
-      course: testCert.course,
-      institution: testCert.institution,
-      isValid: testCert.isValid
-    });
+    // Verify the file was written correctly
+    if (fs.existsSync(configPath)) {
+      const savedConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      if (savedConfig.address === contractAddress && savedConfig.abi) {
+        console.log("✅ Configuration file verified successfully!");
+      } else {
+        throw new Error("Configuration file verification failed");
+      }
+    } else {
+      throw new Error("Configuration file was not created");
+    }
     
   } catch (error) {
-    console.log("⚠️  Test certificate issuance failed:", error);
+    console.error("❌ Deployment failed:");
+    console.error(error);
+    process.exit(1);
   }
 }
 
-main()
-  .then(() => {
-    console.log("\n🎉 Deployment completed successfully!");
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error("❌ Deployment failed:", error);
-    process.exit(1);
-  });
+// Handle unhandled promise rejections
+main().catch((error) => {
+  console.error("❌ Unhandled error:");
+  console.error(error);
+  process.exit(1);
+});

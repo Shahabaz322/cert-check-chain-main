@@ -4,7 +4,7 @@ const INFURA_API_KEY = import.meta.env.VITE_INFURA_API_KEY;
 
 // Replace these in your src/lib/web3.ts file after deployment:
 
-export const CONTRACT_ADDRESS = '0xE3846395266Bd89bab1Afa1CDE2e83A398dfe96D'; // From deployment output
+export const CONTRACT_ADDRESS = '0x91955EaEDcE878be203030b84C792a035391a3F7'; // From deployment output
 
 export const CONTRACT_ABI = [
   {
@@ -400,6 +400,29 @@ export const checkNetwork = async (provider: ethers.BrowserProvider): Promise<bo
   }
 };
 
+// Improved network checking function with polling
+const waitForNetworkSwitch = async (expectedChainId: string, maxAttempts: number = 10): Promise<boolean> => {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      if (!window.ethereum) return false;
+      
+      const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+      console.log(`Network check attempt ${attempt + 1} - Expected: ${expectedChainId}, Current: ${currentChainId}`);
+      
+      if (currentChainId === expectedChainId) {
+        console.log('Network switch successful!');
+        return true;
+      }
+      
+      // Wait before next attempt
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (error) {
+      console.error(`Network check attempt ${attempt + 1} failed:`, error);
+    }
+  }
+  return false;
+};
+
 export const connectWallet = async (): Promise<Web3State> => {
   try {
     let provider = await getWeb3Provider();
@@ -439,28 +462,27 @@ export const connectWallet = async (): Promise<Web3State> => {
     if (!isCorrectNetwork) {
       console.log('Wrong network detected, switching...');
       
-      if (USE_GANACHE) {
-        await switchToGanache();
-      } else {
-        await switchToSepolia();
+      try {
+        if (USE_GANACHE) {
+          await switchToGanache();
+        } else {
+          await switchToSepolia();
+        }
+        
+        // Use improved polling method to wait for network switch
+        isCorrectNetwork = await waitForNetworkSwitch(CURRENT_NETWORK_CONFIG.chainId);
+        
+      } catch (switchError: any) {
+        console.error('Network switch failed:', switchError);
+        
+        // If automatic switch fails, provide clear instructions
+        const networkName = USE_GANACHE ? 'Ganache Local (Chain ID: 1337)' : 'Sepolia testnet (Chain ID: 11155111)';
+        throw new Error(`Failed to switch to ${networkName}. Please manually switch to this network in MetaMask and try again.`);
       }
-
-      // Wait for network switch to complete
-      console.log('Waiting for network switch to complete...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Check network again after switch
-      isCorrectNetwork = await checkCurrentNetwork();
       
       if (!isCorrectNetwork) {
-        // One more retry
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        isCorrectNetwork = await checkCurrentNetwork();
-        
-        if (!isCorrectNetwork) {
-          const networkName = USE_GANACHE ? 'Ganache Local (Chain ID: 1337)' : 'Sepolia testnet (Chain ID: 11155111)';
-          throw new Error(`Please manually switch to ${networkName} in MetaMask and try again.`);
-        }
+        const networkName = USE_GANACHE ? 'Ganache Local (Chain ID: 1337)' : 'Sepolia testnet (Chain ID: 11155111)';
+        throw new Error(`Unable to connect to ${networkName}. Please manually switch to this network in MetaMask and try again.`);
       }
     }
 
@@ -495,15 +517,15 @@ export const connectWallet = async (): Promise<Web3State> => {
 
     const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
-    // Test contract
+    // Test contract - Updated to use certificate contract method
     try {
-      await contract.x();
+      await contract.getTotalCertificates();
       console.log('Contract test successful!');
     } catch (contractError: any) {
       console.error('Contract test failed:', contractError);
       if (contractError.message?.includes('call exception') || contractError.code === 'CALL_EXCEPTION') {
         const networkName = USE_GANACHE ? 'Ganache' : 'Sepolia testnet';
-        throw new Error(`Counter contract not found at address ${CONTRACT_ADDRESS} on ${networkName}.`);
+        throw new Error(`Certificate contract not found at address ${CONTRACT_ADDRESS} on ${networkName}.`);
       }
       throw contractError;
     }
@@ -533,16 +555,18 @@ export const connectWallet = async (): Promise<Web3State> => {
 export const switchToGanache = async (): Promise<void> => {
   if (!window.ethereum) throw new Error('MetaMask not detected');
 
-  const expectedChainId = GANACHE_NETWORK_CONFIG.chainId;
-
   try {
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
-      params: [{ chainId: expectedChainId }],
+      params: [{ chainId: GANACHE_NETWORK_CONFIG.chainId }],
     });
+    
+    console.log('Network switch request sent for Ganache');
+    
   } catch (switchError: any) {
     if (switchError.code === 4902) {
       // Network not added yet, add it
+      console.log('Adding Ganache network to MetaMask...');
       await window.ethereum.request({
         method: 'wallet_addEthereumChain',
         params: [GANACHE_NETWORK_CONFIG],
@@ -550,41 +574,27 @@ export const switchToGanache = async (): Promise<void> => {
     } else if (switchError.code === 4001) {
       throw new Error('Network switch rejected by user');
     } else {
+      console.error('Switch error:', switchError);
       throw new Error('Failed to switch to Ganache network. Please switch manually.');
     }
   }
-
-  // Wait until MetaMask confirms the network switch
-  await new Promise<void>((resolve, reject) => {
-    const networkSwitchHandler = (chainId: string) => {
-      if (chainId === expectedChainId) {
-        window.ethereum?.removeListener('chainChanged', networkSwitchHandler);
-        resolve();
-      }
-    };
-    window.ethereum?.on('chainChanged', networkSwitchHandler);
-
-    // Safety timeout in case chainChanged doesn't fire
-    setTimeout(() => {
-      window.ethereum?.removeListener('chainChanged', networkSwitchHandler);
-      reject(new Error('Network switch timeout. Please switch manually.'));
-    }, 5000);
-  });
 };
 
 export const switchToSepolia = async (): Promise<void> => {
   if (!window.ethereum) throw new Error('MetaMask not detected');
 
-  const expectedChainId = SEPOLIA_NETWORK_CONFIG.chainId;
-
   try {
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
-      params: [{ chainId: expectedChainId }],
+      params: [{ chainId: SEPOLIA_NETWORK_CONFIG.chainId }],
     });
+    
+    console.log('Network switch request sent for Sepolia');
+    
   } catch (switchError: any) {
     if (switchError.code === 4902) {
       // Network not added yet, add it
+      console.log('Adding Sepolia network to MetaMask...');
       await window.ethereum.request({
         method: 'wallet_addEthereumChain',
         params: [SEPOLIA_NETWORK_CONFIG],
@@ -592,26 +602,10 @@ export const switchToSepolia = async (): Promise<void> => {
     } else if (switchError.code === 4001) {
       throw new Error('Network switch rejected by user');
     } else {
+      console.error('Switch error:', switchError);
       throw new Error('Failed to switch to Sepolia network. Please switch manually.');
     }
   }
-
-  // Wait until MetaMask confirms the network switch
-  await new Promise<void>((resolve, reject) => {
-    const networkSwitchHandler = (chainId: string) => {
-      if (chainId === expectedChainId) {
-        window.ethereum?.removeListener('chainChanged', networkSwitchHandler);
-        resolve();
-      }
-    };
-    window.ethereum?.on('chainChanged', networkSwitchHandler);
-
-    // Safety timeout
-    setTimeout(() => {
-      window.ethereum?.removeListener('chainChanged', networkSwitchHandler);
-      reject(new Error('Network switch timeout. Please switch manually.'));
-    }, 5000);
-  });
 };
 
 // Utility function to get current network info
@@ -644,36 +638,50 @@ export const isMetaMaskInstalled = (): boolean => {
          window.ethereum.isMetaMask === true;
 };
 
-// Counter contract specific utility functions
-export const getCounterValue = async (contract: ethers.Contract): Promise<number> => {
+// Certificate contract specific utility functions
+export const getTotalCertificates = async (contract: ethers.Contract): Promise<number> => {
   try {
-    const value = await contract.x();
+    const value = await contract.getTotalCertificates();
     return Number(value);
   } catch (error) {
-    console.error('Error getting counter value:', error);
+    console.error('Error getting total certificates:', error);
     throw error;
   }
 };
 
-export const incrementCounter = async (contract: ethers.Contract): Promise<ethers.ContractTransactionResponse> => {
+export const issueCertificate = async (
+  contract: ethers.Contract,
+  recipient: string,
+  name: string,
+  course: string,
+  institution: string,
+  dateIssued: number
+): Promise<ethers.ContractTransactionResponse> => {
   try {
-    const tx = await contract.inc();
+    const tx = await contract.issueCertificate(recipient, name, course, institution, dateIssued);
     return tx;
   } catch (error) {
-    console.error('Error incrementing counter:', error);
+    console.error('Error issuing certificate:', error);
     throw error;
   }
 };
 
-export const incrementCounterBy = async (contract: ethers.Contract, amount: number): Promise<ethers.ContractTransactionResponse> => {
+export const getCertificate = async (contract: ethers.Contract, certificateId: number): Promise<any> => {
   try {
-    if (amount <= 0) {
-      throw new Error('Increment amount must be positive');
-    }
-    const tx = await contract.incBy(amount);
-    return tx;
+    const certificate = await contract.getCertificate(certificateId);
+    return certificate;
   } catch (error) {
-    console.error('Error incrementing counter by amount:', error);
+    console.error('Error getting certificate:', error);
+    throw error;
+  }
+};
+
+export const verifyCertificate = async (contract: ethers.Contract, certificateId: number): Promise<boolean> => {
+  try {
+    const isValid = await contract.verifyCertificate(certificateId);
+    return isValid;
+  } catch (error) {
+    console.error('Error verifying certificate:', error);
     throw error;
   }
 };
