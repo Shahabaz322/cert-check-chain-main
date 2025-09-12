@@ -18,7 +18,7 @@ const Home = () => {
     {
       icon: Users,
       title: 'Trusted by Institutions',
-      description: 'Educational institutions worldwide trust VeriDoc for certificate management.'
+      description: 'Educational institutions worldwide trust Digi-Pramaan for certificate management.'
     },
     {
       icon: Building,
@@ -42,7 +42,7 @@ const Home = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Shield className="w-8 h-8 text-primary" />
-              <span className="text-2xl font-bold text-foreground">VeriDoc</span>
+              <span className="text-2xl font-bold text-foreground">Digi-Pramaan</span>
             </div>
             <div className="flex items-center gap-4">
               <Link to="/verify">
@@ -104,7 +104,7 @@ const Home = () => {
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-foreground mb-4">
-              Why Choose VeriDoc?
+              Why Choose Digi-Pramaan?
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               Built on cutting-edge blockchain technology to ensure the highest standards of certificate security and verification.
@@ -236,7 +236,7 @@ const Home = () => {
             Ready to Secure Your Certificates?
           </h2>
           <p className="text-xl text-primary-foreground/90 mb-8 max-w-2xl mx-auto">
-            Join thousands of institutions already using VeriDoc to protect their academic credentials with blockchain technology.
+            Join thousands of institutions already using Digi-Pramaan to protect their academic credentials with blockchain technology.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/issue">
@@ -258,7 +258,7 @@ const Home = () => {
         <div className="max-w-6xl mx-auto px-6 text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Shield className="w-6 h-6" />
-            <span className="text-xl font-bold">VeriDoc</span>
+            <span className="text-xl font-bold">Digi-Pramaan</span>
           </div>
           <p className="text-background/80 mb-4">
             Blockchain-powered certificate authenticity validation
