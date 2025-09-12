@@ -32,29 +32,28 @@
 ```bash
 git clone https://github.com/your-username/cert-check-chain.git
 cd cert-check-chain
-Install dependencies:
 
-bash
-Copy code
+2.**Install dependencies:**
+
+```bash
 npm install
-Set up environment variables:
+
+3. **Set up environment variables:**
 
 Create a .env.local file in the root directory:
 
-env
-Copy code
 NEXT_PUBLIC_SUPABASE_URL=<YOUR_SUPABASE_URL>
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<YOUR_SUPABASE_ANON_KEY>
 NEXT_PUBLIC_CONTRACT_ADDRESS=<YOUR_CONTRACT_ADDRESS>
 NEXT_PUBLIC_RPC_URL=<YOUR_ETHEREUM_RPC_URL>
-Run the development server:
 
-bash
-Copy code
+4. **Run the development server: **
+
+```bash
 npm run dev
 Open http://localhost:3000 in your browser.
 
-Usage
+## Usage
 Connect your Ethereum wallet using MetaMask or WalletConnect.
 
 Upload the certificate PDF file to verify.
