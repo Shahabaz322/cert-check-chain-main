@@ -4,11 +4,13 @@ CREATE TABLE public.issued_certificates (
   student_name VARCHAR NOT NULL,
   roll_number VARCHAR NOT NULL,
   course VARCHAR NOT NULL,
-  certificate_id VARCHAR NOT NULL UNIQUE,
+  certificate_id BIGINT NOT NULL UNIQUE,
   certificate_hash VARCHAR NOT NULL UNIQUE,
   institution_wallet VARCHAR NOT NULL,
   blockchain_tx_hash VARCHAR,
+  is_revoked BOOLEAN NOT NULL DEFAULT false,
   issued_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  revoked_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
@@ -20,6 +22,7 @@ CREATE TABLE public.verification_logs (
   verifier_wallet VARCHAR,
   result BOOLEAN NOT NULL,
   certificate_data JSONB,
+  blockchain_tx_hash VARCHAR,
   verified_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 

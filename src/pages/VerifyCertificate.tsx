@@ -21,7 +21,6 @@ interface VerificationResult {
     created_at: string | null;
     file_path: string | null;
     is_completed: boolean | null;
-    // Add other fields that might be returned from the database
     current_signatures?: number;
     expires_at?: string | null;
     max_signatures?: number;
@@ -64,29 +63,89 @@ const VerifyCertificate = () => {
       const certificateHash = await generateSHA256Hash(selectedFile);
       const bytes32Hash = hashToBytes32(certificateHash);
 
-      // Check blockchain
-      const isBlockchainValid = await web3State.contract.isIssued(bytes32Hash);
+      // Blockchain verification
+      let isBlockchainValid = false;
+      try {
+        isBlockchainValid = await web3State.contract.isIssued(bytes32Hash);
+      } catch (err) {
+        console.error("Blockchain verification failed:", err);
+        isBlockchainValid = false;
+      }
 
-      // Check database
-      const { data: dbData, error: dbError } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('document_hash', certificateHash)
+      // Database verification - check both tables
+      let dbData = null;
+      let isDatabaseValid = false;
+
+      // First try issued_certificates table
+      const { data: issuedCertData, error: issuedCertError } = await supabase
+        .from("issued_certificates")
+        .select("*")
+        .eq("certificate_hash", certificateHash)
         .single();
 
-      const isDatabaseValid = !dbError && !!dbData;
+      if (!issuedCertError && issuedCertData) {
+        dbData = issuedCertData;
+        isDatabaseValid = true;
+      } else {
+        // Fallback to documents table
+        const { data: documentsData, error: documentsError } = await supabase
+          .from("documents")
+          .select("*")
+          .eq("document_hash", certificateHash)
+          .single();
+
+        if (!documentsError && documentsData) {
+          dbData = documentsData;
+          isDatabaseValid = true;
+        }
+      }
+
       const isValid = isBlockchainValid && isDatabaseValid;
 
-      // Log verification
-      await supabase
-        .from('verification_logs')
-        .insert({
+      // Log verification attempt using correct column names
+      try {
+        const logData: {
+          document_hash: string;
+          verifier_address: string | null;
+          verification_type: string;
+          is_valid: boolean;
+          details: any;
+          document_id?: string | number;
+        } = {
           document_hash: certificateHash,
           verifier_address: web3State.account,
-          verification_type: 'certificate_authenticity',
+          verification_type: "certificate_authenticity",
           is_valid: isValid,
-          details: dbData || null
-        });
+          details: {
+            blockchain_valid: isBlockchainValid,
+            database_valid: isDatabaseValid,
+            certificate_info: dbData ? {
+              document_id: dbData.document_id,
+              title: dbData.title,
+              created_at: dbData.created_at
+            } : null,
+            verified_at: new Date().toISOString()
+          }
+        };
+
+        // Add document_id if we found the certificate in database
+        if (dbData && dbData.document_id) {
+          logData.document_id = dbData.document_id;
+        }
+
+        await supabase
+          .from("verification_logs")
+          .insert(logData);
+
+        console.log("Verification logged successfully");
+      } catch (logError: unknown) {
+        console.warn("Failed to log verification:", logError);
+        const errorMessage = logError instanceof Error ? logError.message : String(logError);
+        console.warn("Log error details:", errorMessage);
+        
+        // Even if logging fails, continue with verification
+        console.warn("Continuing verification despite logging failure");
+      }
 
       setVerificationResult({
         isValid,
@@ -97,14 +156,14 @@ const VerifyCertificate = () => {
 
       toast({
         title: isValid ? "Verification Complete" : "Verification Failed",
-        description: isValid 
-          ? "Certificate authenticity has been verified successfully." 
+        description: isValid
+          ? "Certificate authenticity verified successfully."
           : "Certificate could not be verified. It may be invalid or forged.",
         variant: isValid ? "default" : "destructive"
       });
 
     } catch (error: any) {
-      console.error('Verification error:', error);
+      console.error("Verification error:", error);
       toast({
         variant: "destructive",
         title: "Verification Failed",

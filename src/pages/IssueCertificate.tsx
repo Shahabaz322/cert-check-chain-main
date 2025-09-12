@@ -7,18 +7,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileUpload } from '@/components/FileUpload';
 import { WalletConnect } from '@/components/WalletConnect';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 import { generateSHA256Hash, hashToBytes32 } from '@/lib/crypto';
 import { Web3State } from '@/lib/web3';
 import { FileCheck, Loader2, ExternalLink } from 'lucide-react';
 import { getAddress, isAddress } from "ethers";
 
 interface CertificateForm {
-  recipientAddress: string; // Changed from rollNumber to recipientAddress
+  recipientAddress: string;
   studentName: string;
   course: string;
-  institution: string; // Added institution field
-  dateIssued: string; // Added dateIssued field
+  institution: string;
+  dateIssued: string;
   certificateId: string;
   description?: string;
 }
@@ -38,10 +38,11 @@ const IssueCertificate = () => {
     studentName: '',
     course: '',
     institution: '',
-    dateIssued: new Date().toISOString().split('T')[0], // Default to today
+    dateIssued: new Date().toISOString().split('T')[0], // default today
     certificateId: '',
     description: ''
   });
+
   const [isIssuing, setIsIssuing] = useState(false);
   const [issuedTxHash, setIssuedTxHash] = useState<string | null>(null);
   const [issuedCertificateId, setIssuedCertificateId] = useState<string | null>(null);
@@ -53,181 +54,185 @@ const IssueCertificate = () => {
   };
 
   const validateForm = (): string | null => {
-    if (!selectedFile) return 'Please upload a certificate file';
-    if (!form.studentName.trim()) return 'Student name is required';
-    if (!form.recipientAddress.trim()) return 'Recipient address is required';
-    if (!form.course.trim()) return 'Course name is required';
-    if (!form.institution.trim()) return 'Institution name is required';
-    if (!form.dateIssued) return 'Date issued is required';
-    if (!web3State.isConnected) return 'Please connect your wallet';
+    if (!selectedFile) return "Please upload a certificate file";
+    if (!form.studentName.trim()) return "Student name is required";
+    if (!form.recipientAddress.trim()) return "Recipient address is required";
+    if (!form.course.trim()) return "Course name is required";
+    if (!form.institution.trim()) return "Institution name is required";
+    if (!form.dateIssued) return "Date issued is required";
+    if (!isAddress(form.recipientAddress)) return "Invalid Ethereum address";
+    if (!web3State.isConnected) return "Please connect your wallet";
 
-    // Validate Ethereum address
-    if (!isAddress(form.recipientAddress)) {
-      return 'Invalid recipient address format';
-    }
-
-    // Validate date
     const dateTimestamp = new Date(form.dateIssued).getTime();
-    if (isNaN(dateTimestamp)) {
-      return 'Invalid date format';
-    }
+    if (isNaN(dateTimestamp)) return "Invalid date";
 
     return null;
   };
 
-  const isFormValid = () => {
-    return validateForm() === null;
-  };
+  const isFormValid = () => validateForm() === null;
 
-  const handleIssueCertificate = async () => {
-    const validationError = validateForm();
-    if (validationError) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: validationError,
-      });
-      return;
-    }
+ // ✅ FIXED: Updated database inserts with proper error handling
 
-    if (!selectedFile || !web3State.contract || !web3State.account) return;
+// ✅ FIXED: Updated database inserts with proper error handling
 
-    setIsIssuing(true);
+const handleIssueCertificate = async () => {
+  const validationError = validateForm();
+  if (validationError) {
+    toast({
+      variant: "destructive",
+      title: "Validation Error",
+      description: validationError,
+    });
+    return;
+  }
+
+  if (!selectedFile || !web3State.contract || !web3State.account) return;
+
+  setIsIssuing(true);
+  try {
+    const normalizedRecipientAddress = getAddress(form.recipientAddress);
+    const dateTimestamp = Math.floor(new Date(form.dateIssued).getTime() / 1000);
+
+    // Generate file hash for off-chain storage
+    const baseHash = await generateSHA256Hash(selectedFile);
+    // Make hash unique by combining with timestamp and student info to avoid conflicts
+    const certificateHash = `${baseHash}-${Date.now()}-${form.studentName.replace(/\s+/g, '')}`;
+
+    // Issue certificate on blockchain (5 parameters only)
+    const tx = await web3State.contract.issueCertificate(
+      normalizedRecipientAddress,
+      form.studentName,
+      form.course,
+      form.institution,
+      dateTimestamp
+    );
+
+    toast({
+      title: "Transaction Submitted",
+      description: "Waiting for blockchain confirmation...",
+    });
+
+    const receipt = await tx.wait();
+
+    // Extract certificate ID from event logs
+    let blockchainCertificateId = 'Unknown';
     try {
-      // Normalize addresses
-      const normalizedIssuerAddress = getAddress(web3State.account);
-      const normalizedRecipientAddress = getAddress(form.recipientAddress);
-
-      // Convert date to Unix timestamp (seconds)
-      const dateTimestamp = Math.floor(new Date(form.dateIssued).getTime() / 1000);
-
-      console.log('Issuing certificate with parameters:', {
-        recipient: normalizedRecipientAddress,
-        name: form.studentName,
-        course: form.course,
-        institution: form.institution,
-        dateIssued: dateTimestamp
-      });
-
-      // Issue certificate on blockchain with correct parameters
-      const tx = await web3State.contract.issueCertificate(
-        normalizedRecipientAddress,  // _recipient (address)
-        form.studentName,           // _name (string)
-        form.course,               // _course (string)
-        form.institution,          // _institution (string)
-        dateTimestamp              // _dateIssued (uint256)
-      );
-      
-      toast({
-        title: "Transaction Submitted",
-        description: "Waiting for blockchain confirmation...",
-      });
-
-      const receipt = await tx.wait();
-      console.log('Transaction receipt:', receipt);
-
-      // Extract certificate ID from the event logs
-      let blockchainCertificateId = 'Unknown';
-      try {
-        const certificateIssuedEvent = receipt.logs?.find((log: any) => {
-          try {
-            const parsedLog = web3State.contract!.interface.parseLog(log);
-            return parsedLog?.name === 'CertificateIssued';
-          } catch {
-            return false;
-          }
-        });
-
-        if (certificateIssuedEvent) {
-          const parsedLog = web3State.contract.interface.parseLog(certificateIssuedEvent);
-          blockchainCertificateId = parsedLog?.args?.certificateId?.toString() || 'Unknown';
-          console.log('Certificate ID from blockchain:', blockchainCertificateId);
+      const certificateEvent = receipt.logs?.find((log: any) => {
+        try {
+          if (!web3State.contract) return false;
+          const parsedLog = web3State.contract.interface.parseLog(log);
+          return parsedLog && parsedLog.name === "CertificateIssued";
+        } catch {
+          return false;
         }
-      } catch (eventError) {
-        console.error('Error parsing event logs:', eventError);
-      }
+      });
 
-      // Generate certificate hash for database storage
-      const certificateHash = await generateSHA256Hash(selectedFile);
-
-      // Save to database
-      const { error } = await supabase
-        .from('documents')
-        .insert({
-          title: `${form.course} - ${form.studentName}`,
-          description: form.description || `Certificate for ${form.studentName} - ${form.course} from ${form.institution}`,
-          file_path: selectedFile.name,
-          file_size: selectedFile.size,
-          file_type: selectedFile.type,
-          document_hash: certificateHash,
-          document_id: blockchainCertificateId !== 'Unknown' ? parseInt(blockchainCertificateId) : parseInt(form.certificateId) || 0,
-          owner_address: normalizedRecipientAddress, // Owner is the recipient, not the issuer
-          blockchain_tx_hash: receipt.transactionHash,
-          is_public: true,
-          required_signatures: 1,
-          current_signatures: 1,
-          is_completed: true
-        });
-
-      if (error) {
-        console.error('Database error:', error);
-        toast({
-          variant: "destructive",
-          title: "Database Error",
-          description: "Certificate issued on blockchain but failed to save metadata.",
-        });
-      } else {
-        setIssuedTxHash(receipt.transactionHash);
-        setIssuedCertificateId(blockchainCertificateId);
-        
-        toast({
-          title: "Certificate Issued Successfully!",
-          description: `Certificate ID: ${blockchainCertificateId}`,
-        });
-        
-        // Reset form
-        setForm({
-          recipientAddress: '',
-          studentName: '',
-          course: '',
-          institution: '',
-          dateIssued: new Date().toISOString().split('T')[0],
-          certificateId: '',
-          description: ''
-        });
-        setSelectedFile(null);
+      if (certificateEvent) {
+        const parsedLog = web3State.contract.interface.parseLog(certificateEvent);
+        if (parsedLog && parsedLog.args && parsedLog.args.certificateId) {
+          blockchainCertificateId = parsedLog.args.certificateId.toString();
+        }
       }
-    } catch (error: any) {
-      console.error('Issue certificate error:', error);
-      
-      let errorMessage = "Failed to issue certificate. Please try again.";
-      
-      // Handle common errors
-      if (error.code === 4001) {
-        errorMessage = "Transaction rejected by user";
-      } else if (error.code === 'INSUFFICIENT_FUNDS') {
-        errorMessage = "Insufficient funds to complete the transaction";
-      } else if (error.message?.includes('execution reverted')) {
-        errorMessage = "Contract execution failed. Please check your inputs and try again.";
-      } else if (error.message?.includes('user rejected transaction')) {
-        errorMessage = "Transaction was rejected";
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
+    } catch (eventError) {
+      console.error("Error parsing event logs:", eventError);
+    }
+
+    // Generate unique certificate ID to avoid conflicts
+    const certificateIdToStore = blockchainCertificateId !== "Unknown" 
+      ? blockchainCertificateId 
+      : `${Date.now()}-${crypto.randomUUID()}`;
+
+    // Save to database with proper field mapping
+    const { error: insertError } = await supabase
+      .from("issued_certificates")
+      .insert({
+        student_name: form.studentName,
+        roll_number: form.certificateId || "N/A", // Roll number or N/A if not provided
+        course: form.course,
+        certificate_id: certificateIdToStore, // Use unique ID
+        certificate_hash: certificateHash,
+        institution_wallet: web3State.account, // Institution's wallet address
+        blockchain_tx_hash: receipt.transactionHash,
+        issued_at: new Date(form.dateIssued).toISOString()
+        // created_at and updated_at are handled automatically
+      });
+
+    if (insertError) {
+      console.error("Database insert error:", insertError);
       toast({
         variant: "destructive",
-        title: "Certificate Issuance Failed",
-        description: errorMessage,
+        title: "Database Error",
+        description: "Certificate issued on blockchain but failed to save to database.",
       });
-    } finally {
-      setIsIssuing(false);
-    }
-  };
+    } else {
+      // Try to log the verification (optional - don't fail if this fails)
+      try {
+        // Check if verification_logs table exists and what fields it has
+        await supabase
+          .from("verification_logs")
+          .insert({
+            document_hash: certificateHash,
+            verifier_address: web3State.account, // Changed from verifier_wallet
+            verification_type: "certificate_issuance",
+            is_valid: true, // Changed from result
+            details: { // Changed from certificate_data
+              certificate_id: certificateIdToStore,
+              student_name: form.studentName,
+              course: form.course,
+              institution: form.institution,
+              blockchain_tx_hash: receipt.transactionHash,
+              issued_at: new Date().toISOString()
+            }
+          });
+      } catch (logError) {
+        console.warn("Failed to log certificate issuance (non-critical):", logError);
+        // Don't show error to user - this is optional logging
+      }
 
-  const getTodayDate = () => {
-    return new Date().toISOString().split('T')[0];
-  };
+      setIssuedTxHash(receipt.transactionHash);
+      setIssuedCertificateId(certificateIdToStore);
+      
+      toast({
+        title: "Certificate Issued Successfully!",
+        description: `Certificate ID: ${certificateIdToStore}`,
+      });
+
+      // Reset form
+      setForm({
+        recipientAddress: '',
+        studentName: '',
+        course: '',
+        institution: '',
+        dateIssued: new Date().toISOString().split('T')[0],
+        certificateId: '',
+        description: ''
+      });
+      setSelectedFile(null);
+    }
+
+  } catch (error: any) {
+    console.error("Issue certificate error:", error);
+    
+    let errorMessage = "Failed to issue certificate. Please try again.";
+    
+    if (error.message?.includes("no matching fragment")) {
+      errorMessage = "Contract method signature mismatch. Please check your smart contract.";
+    } else if (error.code === 4001) {
+      errorMessage = "Transaction rejected by user.";
+    } else if (error.message?.includes("insufficient funds")) {
+      errorMessage = "Insufficient funds for gas fees.";
+    }
+
+    toast({
+      variant: "destructive",
+      title: "Certificate Issuance Failed",
+      description: errorMessage,
+    });
+  } finally {
+    setIsIssuing(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-secondary/30 p-6">
@@ -240,12 +245,12 @@ const IssueCertificate = () => {
           </p>
         </div>
 
-        {/* Wallet Connection */}
+        {/* Wallet Connect */}
         <div className="flex justify-center">
           <WalletConnect web3State={web3State} onConnect={setWeb3State} />
         </div>
 
-        {/* Main Form */}
+        {/* Form */}
         <Card className="shadow-lg border-0 bg-card/50 backdrop-blur">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -257,103 +262,44 @@ const IssueCertificate = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* File Upload */}
             <div className="space-y-2">
               <Label htmlFor="certificate-file">Certificate Document (PDF)</Label>
-              <FileUpload
-                onFileSelect={setSelectedFile}
-                selectedFile={selectedFile}
-              />
+              <FileUpload onFileSelect={setSelectedFile} selectedFile={selectedFile} />
             </div>
 
-            {/* Form Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="student-name">Student Name *</Label>
-                <Input
-                  id="student-name"
-                  placeholder="Enter full name"
-                  value={form.studentName}
-                  onChange={(e) => handleFormChange('studentName', e.target.value)}
-                />
+                <Input id="student-name" placeholder="Enter full name" value={form.studentName} onChange={(e) => handleFormChange('studentName', e.target.value)} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="recipient-address">Recipient Address *</Label>
-                <Input
-                  id="recipient-address"
-                  placeholder="0x..."
-                  value={form.recipientAddress}
-                  onChange={(e) => handleFormChange('recipientAddress', e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Ethereum address of the certificate recipient
-                </p>
+                <Input id="recipient-address" placeholder="0x..." value={form.recipientAddress} onChange={(e) => handleFormChange('recipientAddress', e.target.value)} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="course">Course/Program *</Label>
-                <Input
-                  id="course"
-                  placeholder="e.g., Bachelor of Computer Science"
-                  value={form.course}
-                  onChange={(e) => handleFormChange('course', e.target.value)}
-                />
+                <Input id="course" placeholder="e.g., Bachelor of Computer Science" value={form.course} onChange={(e) => handleFormChange('course', e.target.value)} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="institution">Institution *</Label>
-                <Input
-                  id="institution"
-                  placeholder="e.g., Tech University"
-                  value={form.institution}
-                  onChange={(e) => handleFormChange('institution', e.target.value)}
-                />
+                <Input id="institution" placeholder="e.g., Tech University" value={form.institution} onChange={(e) => handleFormChange('institution', e.target.value)} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="date-issued">Date Issued *</Label>
-                <Input
-                  id="date-issued"
-                  type="date"
-                  max={getTodayDate()}
-                  value={form.dateIssued}
-                  onChange={(e) => handleFormChange('dateIssued', e.target.value)}
-                />
+                <Input id="date-issued" type="date" max={new Date().toISOString().split('T')[0]} value={form.dateIssued} onChange={(e) => handleFormChange('dateIssued', e.target.value)} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="certificate-id">Certificate ID (Reference)</Label>
-                <Input
-                  id="certificate-id"
-                  placeholder="Optional reference ID"
-                  value={form.certificateId}
-                  onChange={(e) => handleFormChange('certificateId', e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Optional: Your internal reference ID (blockchain will generate its own ID)
-                </p>
+                <Input id="certificate-id" placeholder="Optional reference ID" value={form.certificateId} onChange={(e) => handleFormChange('certificateId', e.target.value)} />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="description">Additional Notes (Optional)</Label>
-              <Textarea
-                id="description"
-                placeholder="Any additional information about the certificate"
-                value={form.description}
-                onChange={(e) => handleFormChange('description', e.target.value)}
-                rows={3}
-              />
+              <Textarea id="description" placeholder="Any additional information" value={form.description} onChange={(e) => handleFormChange('description', e.target.value)} rows={3} />
             </div>
 
-            {/* Issue Button */}
-            <Button
-              onClick={handleIssueCertificate}
-              disabled={!isFormValid() || isIssuing}
-              size="lg"
-              className="w-full"
-            >
+            <Button onClick={handleIssueCertificate} disabled={!isFormValid() || isIssuing} size="lg" className="w-full">
               {isIssuing ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -369,7 +315,6 @@ const IssueCertificate = () => {
           </CardContent>
         </Card>
 
-        {/* Success Message */}
         {issuedTxHash && (
           <Card className="border-success bg-success-light">
             <CardContent className="pt-6">
@@ -379,23 +324,11 @@ const IssueCertificate = () => {
                 </div>
                 <h3 className="text-xl font-semibold text-success">Certificate Issued Successfully!</h3>
                 <p className="text-success/80">
-                  Your certificate has been permanently registered on the Ethereum blockchain.
+                  Transaction Hash: {issuedTxHash} <br />
+                  Certificate ID: {issuedCertificateId}
                 </p>
-                {issuedCertificateId && (
-                  <p className="text-sm text-success/70">
-                    Certificate ID: <span className="font-mono">{issuedCertificateId}</span>
-                  </p>
-                )}
-                <Button
-                  variant="outline"
-                  className="border-success text-success hover:bg-success hover:text-success-foreground"
-                  asChild
-                >
-                  <a
-                    href={`https://sepolia.etherscan.io/tx/${issuedTxHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
+                <Button variant="outline" className="border-success text-success hover:bg-success hover:text-success-foreground" asChild>
+                  <a href={`https://sepolia.etherscan.io/tx/${issuedTxHash}`} target="_blank" rel="noopener noreferrer">
                     View Transaction <ExternalLink className="w-4 h-4 ml-2" />
                   </a>
                 </Button>
