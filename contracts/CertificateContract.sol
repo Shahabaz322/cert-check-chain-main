@@ -10,6 +10,7 @@ contract CertificateContract {
         string institution;
         uint256 dateIssued;
         bool isValid;
+        bytes32 documentHash; // ✅ added this field properly
     }
 
     mapping(uint256 => Certificate) public certificates;
@@ -21,7 +22,8 @@ contract CertificateContract {
         uint256 indexed certificateId,
         address indexed recipient,
         string name,
-        string course
+        string course,
+        bytes32 documentHash
     );
 
     event CertificateRevoked(uint256 indexed certificateId);
@@ -41,35 +43,15 @@ contract CertificateContract {
         nextCertificateId = 1; // Start from 1
     }
 
+    // ✅ Cleaned up issueCertificate (single version only)
     function issueCertificate(
-    address _recipient,
-    string memory _name,
-    string memory _course,
-    string memory _institution,
-    uint256 _dateIssued,
-    bytes32 _documentHash  // NEW
-    )public onlyOwner returns (uint256) {
-    uint256 certificateId = nextCertificateId;
-    nextCertificateId++;
-
-    certificates[certificateId] = Certificate({
-        id: certificateId,
-        recipient: _recipient,
-        name: _name,
-        course: _course,
-        institution: _institution,
-        dateIssued: _dateIssued,
-        isValid: true,
-        documentHash: _documentHash
-    });
-
-    recipientCertificates[_recipient].push(certificateId);
-
-    emit CertificateIssued(certificateId, _recipient, _name, _course);
-
-    return certificateId;
-}
- public onlyOwner returns (uint256) {
+        address _recipient,
+        string memory _name,
+        string memory _course,
+        string memory _institution,
+        uint256 _dateIssued,
+        bytes32 _documentHash
+    ) public onlyOwner returns (uint256) {
         require(_recipient != address(0), "Invalid recipient address");
         require(bytes(_name).length > 0, "Name cannot be empty");
         require(bytes(_course).length > 0, "Course cannot be empty");
@@ -86,12 +68,13 @@ contract CertificateContract {
             course: _course,
             institution: _institution,
             dateIssued: _dateIssued,
-            isValid: true
+            isValid: true,
+            documentHash: _documentHash
         });
 
         recipientCertificates[_recipient].push(certificateId);
 
-        emit CertificateIssued(certificateId, _recipient, _name, _course);
+        emit CertificateIssued(certificateId, _recipient, _name, _course, _documentHash);
 
         return certificateId;
     }
@@ -114,15 +97,14 @@ contract CertificateContract {
         return certificates[_certificateId].isValid;
     }
 
-    function isIssued(bytes32 documentHash) public view returns (bool) {
-        for (uint256 i = 1; i < nextCertificateId; i++) { // start from 1
-            if (certificates[i].documentHash == documentHash && certificates[i].isValid) {
+    function isIssued(bytes32 _documentHash) public view returns (bool) {
+        for (uint256 i = 1; i < nextCertificateId; i++) {
+            if (certificates[i].documentHash == _documentHash && certificates[i].isValid) {
                 return true;
             }
         }
         return false;
     }
-
 
     function revokeCertificate(uint256 _certificateId)
         public
@@ -130,7 +112,6 @@ contract CertificateContract {
         validCertificate(_certificateId)
     {
         require(certificates[_certificateId].isValid, "Certificate already revoked");
-        
         certificates[_certificateId].isValid = false;
         emit CertificateRevoked(_certificateId);
     }
