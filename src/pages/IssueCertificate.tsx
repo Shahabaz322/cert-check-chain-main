@@ -320,7 +320,7 @@ Timestamp: ${new Date().toISOString()}
     }
   };
 
-  // Real QR code generation with error handling
+  // CORRECTED: Simplified QR code generation with only hash
   const generateQRCode = async (hash: string): Promise<string> => {
     try {
       setProcessingProgress({
@@ -329,22 +329,12 @@ Timestamp: ${new Date().toISOString()}
         message: 'Creating verification QR code...'
       });
 
-      const qrData = {
-        type: 'certificate_verification',
-        hash: hash,
-        rollNumber: form.rollNumber,
-        studentName: form.studentName,
-        institution: form.institution,
-        issueDate: form.dateIssued,
-        timestamp: Date.now(),
-        version: '1.0'
-      };
+      // QR code now contains ONLY the hash
+      const qrContent = hash;
       
-      const qrContent = JSON.stringify(qrData);
-      
-      // Validate QR content size
-      if (qrContent.length > 2000) {
-        throw new Error('QR code data too large. Please use shorter form values.');
+      // Validate hash format
+      if (!/^[a-fA-F0-9]{64}$/.test(hash)) {
+        throw new Error('Invalid hash format for QR code');
       }
 
       const dataUrl = await QRCode.toDataURL(qrContent, { 
@@ -363,13 +353,13 @@ Timestamp: ${new Date().toISOString()}
     }
   };
 
-  // FIX 4: Corrected PDF modification with QR embedding
+  // CORRECTED: PDF modification with QR embedding in TOP-RIGHT corner
   const embedQRInPDF = async (originalFile: File, qrDataUrl: string): Promise<string> => {
     try {
       setProcessingProgress({
         stage: 'Embedding QR Code',
         progress: 90,
-        message: 'Adding QR code to PDF...'
+        message: 'Adding QR code to PDF (top-right corner)...'
       });
 
       const existingPdfBytes = await originalFile.arrayBuffer();
@@ -390,12 +380,12 @@ Timestamp: ${new Date().toISOString()}
       }
 
       const firstPage = pages[0];
-      const { height } = firstPage.getSize();
+      const { width, height } = firstPage.getSize();
 
-      // Position QR code in top-left corner with margin
+      // CORRECTED: Position QR code in TOP-RIGHT corner with margin
       firstPage.drawImage(qrImage, {
-        x: 20,
-        y: height - 140, // 20px from top + 120px QR size
+        x: width - 140, // 20px margin from right edge + 120px QR width
+        y: height - 140, // 20px margin from top + 120px QR height
         width: 120,
         height: 120,
       });
@@ -471,12 +461,12 @@ Timestamp: ${new Date().toISOString()}
       setTextHash(hash);
       setProcessingSteps(prev => ({ ...prev, hashGenerated: true }));
 
-      // Step 3: Generate real QR code
+      // Step 3: Generate real QR code (only hash)
       const qrDataUrl = await generateQRCode(hash);
       setQrCodeDataUrl(qrDataUrl);
       setProcessingSteps(prev => ({ ...prev, qrGenerated: true }));
 
-      // Step 4: Embed QR in PDF (top-left corner)
+      // Step 4: Embed QR in PDF (top-right corner)
       const processedPdfUrl = await embedQRInPDF(selectedFile, qrDataUrl);
       setProcessedPdfUrl(processedPdfUrl);
       setProcessingSteps(prev => ({ ...prev, qrEmbedded: true }));
@@ -688,7 +678,7 @@ Timestamp: ${new Date().toISOString()}
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold text-foreground">Advanced OCR Certificate Issuer</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Extract text from any PDF (including image-based), generate secure hash, embed QR code at top-left, and register on blockchain
+            Extract text from any PDF (including image-based), generate secure hash, embed QR code at top-right, and register on blockchain
           </p>
         </div>
 
@@ -720,13 +710,13 @@ Timestamp: ${new Date().toISOString()}
                 processingSteps.qrGenerated ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
               } border`}>
                 <QrCode className="w-4 h-4" />
-                QR Generated
+                QR Generated (Hash Only)
               </div>
               <div className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm ${
                 processingSteps.qrEmbedded ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
               } border`}>
                 <FileCheck className="w-4 h-4" />
-                QR Embedded (Top-Left)
+                QR Embedded (Top-Right)
               </div>
               <div className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm ${
                 processingSteps.blockchainIssued ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
@@ -798,7 +788,7 @@ Timestamp: ${new Date().toISOString()}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="date-issued">Date Issued *</Label>
+                 <Label htmlFor="date-issued">Date Issued *</Label>
                 <Input 
                   id="date-issued" 
                   type="date" 
@@ -889,6 +879,54 @@ Timestamp: ${new Date().toISOString()}
           </Card>
         )}
 
+        {/* Processing Errors Display */}
+        {processingErrors.length > 0 && (
+          <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-yellow-700 dark:text-yellow-300">
+                <AlertTriangle className="w-5 h-5" />
+                Processing Warnings ({processingErrors.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {processingErrors.map((error, index) => (
+                  <div key={index} className="text-sm text-yellow-700 dark:text-yellow-300 bg-white dark:bg-gray-800 p-2 rounded">
+                    {error}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Processing Progress Display */}
+        {processingProgress && (
+          <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20">
+            <CardContent className="pt-6">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                    {processingProgress.stage}
+                  </span>
+                  <span className="text-sm text-blue-600 dark:text-blue-400">
+                    {processingProgress.progress}%
+                  </span>
+                </div>
+                <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${processingProgress.progress}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  {processingProgress.message}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Extracted Text Display */}
         {extractedText && (
           <Card>
@@ -954,7 +992,7 @@ Timestamp: ${new Date().toISOString()}
                 Verification QR Code
               </CardTitle>
               <CardDescription>
-                Contains hash, student info, and verification data
+                Contains only the SHA-256 hash for simple verification
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -962,10 +1000,13 @@ Timestamp: ${new Date().toISOString()}
                 <div className="p-4 bg-white rounded-lg border-2 border-dashed border-gray-300">
                   <img src={qrCodeDataUrl} alt="Verification QR Code" className="w-32 h-32" />
                 </div>
-                <div className="text-center space-y-1">
-                  <div className="text-sm font-medium">QR Code Position: Top-Left Corner</div>
+                <div className="text-center space-y-2">
+                  <div className="text-sm font-medium">QR Code Position: Top-Right Corner</div>
                   <div className="text-xs text-muted-foreground">
-                    Will be embedded at coordinates (20, 20) with 120px size
+                    Will be embedded at top-right with 20px margin and 120px size
+                  </div>
+                  <div className="text-xs text-gray-600 bg-gray-100 dark:bg-gray-800 p-2 rounded">
+                    <strong>QR Content:</strong> Hash only ({textHash.substring(0, 16)}...)
                   </div>
                 </div>
               </div>
@@ -985,16 +1026,16 @@ Timestamp: ${new Date().toISOString()}
                   PDF with QR Code Ready
                 </h3>
                 <p className="text-sm text-purple-600 dark:text-purple-400">
-                  QR code embedded at top-left corner for verification
+                  QR code (hash only) embedded at top-right corner for verification
                 </p>
               </div>
               <Button 
                 asChild 
                 className="bg-purple-600 hover:bg-purple-700 text-white"
               >
-                <a href={processedPdfUrl} download="certificate-with-verification-qr.pdf">
+                <a href={processedPdfUrl} download="certificate-with-hash-qr.pdf">
                   <FileCheck className="w-4 h-4 mr-2" />
-                  Download PDF with QR Code
+                  Download PDF with Hash QR Code
                 </a>
               </Button>
             </CardContent>
