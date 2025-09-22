@@ -21,11 +21,12 @@ import type {
   TypedLogDescription,
   TypedListener,
   TypedContractMethod,
-} from "./common";
+} from "../common";
 
 export declare namespace CertificateContract {
   export type CertificateStruct = {
     id: BigNumberish;
+    rollNumber: string;
     recipient: AddressLike;
     name: string;
     course: string;
@@ -33,19 +34,23 @@ export declare namespace CertificateContract {
     dateIssued: BigNumberish;
     isValid: boolean;
     documentHash: BytesLike;
+    isClaimed: boolean;
   };
 
   export type CertificateStructOutput = [
     id: bigint,
+    rollNumber: string,
     recipient: string,
     name: string,
     course: string,
     institution: string,
     dateIssued: bigint,
     isValid: boolean,
-    documentHash: string
+    documentHash: string,
+    isClaimed: boolean
   ] & {
     id: bigint;
+    rollNumber: string;
     recipient: string;
     name: string;
     course: string;
@@ -53,6 +58,7 @@ export declare namespace CertificateContract {
     dateIssued: bigint;
     isValid: boolean;
     documentHash: string;
+    isClaimed: boolean;
   };
 }
 
@@ -60,21 +66,32 @@ export interface CertificateContractInterface extends Interface {
   getFunction(
     nameOrSignature:
       | "certificates"
+      | "claimCertificate"
       | "getCertificate"
+      | "getCertificateByHash"
       | "getRecipientCertificates"
+      | "getRollNumberCertificates"
       | "getTotalCertificates"
-      | "isIssued"
+      | "hasRollNumber"
+      | "hashToCertificateId"
       | "issueCertificate"
       | "nextCertificateId"
       | "owner"
       | "recipientCertificates"
       | "revokeCertificate"
+      | "rollNumberCertificates"
+      | "rollNumberExists"
       | "transferOwnership"
       | "verifyCertificate"
+      | "verifyCertificateByHash"
+      | "verifyCertificateByRollNumber"
   ): FunctionFragment;
 
   getEvent(
-    nameOrSignatureOrTopic: "CertificateIssued" | "CertificateRevoked"
+    nameOrSignatureOrTopic:
+      | "CertificateClaimed"
+      | "CertificateIssued"
+      | "CertificateRevoked"
   ): EventFragment;
 
   encodeFunctionData(
@@ -82,21 +99,40 @@ export interface CertificateContractInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "claimCertificate",
+    values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "getCertificate",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getCertificateByHash",
+    values: [BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "getRecipientCertificates",
     values: [AddressLike]
   ): string;
   encodeFunctionData(
+    functionFragment: "getRollNumberCertificates",
+    values: [string]
+  ): string;
+  encodeFunctionData(
     functionFragment: "getTotalCertificates",
     values?: undefined
   ): string;
-  encodeFunctionData(functionFragment: "isIssued", values: [BytesLike]): string;
+  encodeFunctionData(
+    functionFragment: "hasRollNumber",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "hashToCertificateId",
+    values: [BytesLike]
+  ): string;
   encodeFunctionData(
     functionFragment: "issueCertificate",
-    values: [AddressLike, string, string, string, BigNumberish, BytesLike]
+    values: [string, string, string, string, BigNumberish, BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "nextCertificateId",
@@ -112,6 +148,14 @@ export interface CertificateContractInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "rollNumberCertificates",
+    values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "rollNumberExists",
+    values: [string]
+  ): string;
+  encodeFunctionData(
     functionFragment: "transferOwnership",
     values: [AddressLike]
   ): string;
@@ -119,9 +163,21 @@ export interface CertificateContractInterface extends Interface {
     functionFragment: "verifyCertificate",
     values: [BigNumberish]
   ): string;
+  encodeFunctionData(
+    functionFragment: "verifyCertificateByHash",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "verifyCertificateByRollNumber",
+    values: [string, BytesLike]
+  ): string;
 
   decodeFunctionResult(
     functionFragment: "certificates",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "claimCertificate",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -129,14 +185,29 @@ export interface CertificateContractInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "getCertificateByHash",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "getRecipientCertificates",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getRollNumberCertificates",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
     functionFragment: "getTotalCertificates",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "isIssued", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "hasRollNumber",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "hashToCertificateId",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "issueCertificate",
     data: BytesLike
@@ -155,6 +226,14 @@ export interface CertificateContractInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "rollNumberCertificates",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "rollNumberExists",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "transferOwnership",
     data: BytesLike
   ): Result;
@@ -162,26 +241,56 @@ export interface CertificateContractInterface extends Interface {
     functionFragment: "verifyCertificate",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "verifyCertificateByHash",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "verifyCertificateByRollNumber",
+    data: BytesLike
+  ): Result;
+}
+
+export namespace CertificateClaimedEvent {
+  export type InputTuple = [
+    certificateId: BigNumberish,
+    rollNumber: string,
+    recipient: AddressLike
+  ];
+  export type OutputTuple = [
+    certificateId: bigint,
+    rollNumber: string,
+    recipient: string
+  ];
+  export interface OutputObject {
+    certificateId: bigint;
+    rollNumber: string;
+    recipient: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
 
 export namespace CertificateIssuedEvent {
   export type InputTuple = [
     certificateId: BigNumberish,
-    recipient: AddressLike,
+    rollNumber: string,
     name: string,
     course: string,
     documentHash: BytesLike
   ];
   export type OutputTuple = [
     certificateId: bigint,
-    recipient: string,
+    rollNumber: string,
     name: string,
     course: string,
     documentHash: string
   ];
   export interface OutputObject {
     certificateId: bigint;
-    recipient: string;
+    rollNumber: string;
     name: string;
     course: string;
     documentHash: string;
@@ -250,8 +359,20 @@ export interface CertificateContract extends BaseContract {
   certificates: TypedContractMethod<
     [arg0: BigNumberish],
     [
-      [bigint, string, string, string, string, bigint, boolean, string] & {
+      [
+        bigint,
+        string,
+        string,
+        string,
+        string,
+        string,
+        bigint,
+        boolean,
+        string,
+        boolean
+      ] & {
         id: bigint;
+        rollNumber: string;
         recipient: string;
         name: string;
         course: string;
@@ -259,13 +380,26 @@ export interface CertificateContract extends BaseContract {
         dateIssued: bigint;
         isValid: boolean;
         documentHash: string;
+        isClaimed: boolean;
       }
     ],
     "view"
   >;
 
+  claimCertificate: TypedContractMethod<
+    [_rollNumber: string, _certificateId: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+
   getCertificate: TypedContractMethod<
     [_certificateId: BigNumberish],
+    [CertificateContract.CertificateStructOutput],
+    "view"
+  >;
+
+  getCertificateByHash: TypedContractMethod<
+    [_documentHash: BytesLike],
     [CertificateContract.CertificateStructOutput],
     "view"
   >;
@@ -276,13 +410,21 @@ export interface CertificateContract extends BaseContract {
     "view"
   >;
 
+  getRollNumberCertificates: TypedContractMethod<
+    [_rollNumber: string],
+    [bigint[]],
+    "view"
+  >;
+
   getTotalCertificates: TypedContractMethod<[], [bigint], "view">;
 
-  isIssued: TypedContractMethod<[_documentHash: BytesLike], [boolean], "view">;
+  hasRollNumber: TypedContractMethod<[_rollNumber: string], [boolean], "view">;
+
+  hashToCertificateId: TypedContractMethod<[arg0: BytesLike], [bigint], "view">;
 
   issueCertificate: TypedContractMethod<
     [
-      _recipient: AddressLike,
+      _rollNumber: string,
       _name: string,
       _course: string,
       _institution: string,
@@ -309,6 +451,14 @@ export interface CertificateContract extends BaseContract {
     "nonpayable"
   >;
 
+  rollNumberCertificates: TypedContractMethod<
+    [arg0: string, arg1: BigNumberish],
+    [bigint],
+    "view"
+  >;
+
+  rollNumberExists: TypedContractMethod<[arg0: string], [boolean], "view">;
+
   transferOwnership: TypedContractMethod<
     [newOwner: AddressLike],
     [void],
@@ -317,6 +467,18 @@ export interface CertificateContract extends BaseContract {
 
   verifyCertificate: TypedContractMethod<
     [_certificateId: BigNumberish],
+    [boolean],
+    "view"
+  >;
+
+  verifyCertificateByHash: TypedContractMethod<
+    [_documentHash: BytesLike],
+    [boolean],
+    "view"
+  >;
+
+  verifyCertificateByRollNumber: TypedContractMethod<
+    [_rollNumber: string, _documentHash: BytesLike],
     [boolean],
     "view"
   >;
@@ -330,8 +492,20 @@ export interface CertificateContract extends BaseContract {
   ): TypedContractMethod<
     [arg0: BigNumberish],
     [
-      [bigint, string, string, string, string, bigint, boolean, string] & {
+      [
+        bigint,
+        string,
+        string,
+        string,
+        string,
+        string,
+        bigint,
+        boolean,
+        string,
+        boolean
+      ] & {
         id: bigint;
+        rollNumber: string;
         recipient: string;
         name: string;
         course: string;
@@ -339,9 +513,17 @@ export interface CertificateContract extends BaseContract {
         dateIssued: bigint;
         isValid: boolean;
         documentHash: string;
+        isClaimed: boolean;
       }
     ],
     "view"
+  >;
+  getFunction(
+    nameOrSignature: "claimCertificate"
+  ): TypedContractMethod<
+    [_rollNumber: string, _certificateId: BigNumberish],
+    [void],
+    "nonpayable"
   >;
   getFunction(
     nameOrSignature: "getCertificate"
@@ -351,19 +533,32 @@ export interface CertificateContract extends BaseContract {
     "view"
   >;
   getFunction(
+    nameOrSignature: "getCertificateByHash"
+  ): TypedContractMethod<
+    [_documentHash: BytesLike],
+    [CertificateContract.CertificateStructOutput],
+    "view"
+  >;
+  getFunction(
     nameOrSignature: "getRecipientCertificates"
   ): TypedContractMethod<[_recipient: AddressLike], [bigint[]], "view">;
+  getFunction(
+    nameOrSignature: "getRollNumberCertificates"
+  ): TypedContractMethod<[_rollNumber: string], [bigint[]], "view">;
   getFunction(
     nameOrSignature: "getTotalCertificates"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
-    nameOrSignature: "isIssued"
-  ): TypedContractMethod<[_documentHash: BytesLike], [boolean], "view">;
+    nameOrSignature: "hasRollNumber"
+  ): TypedContractMethod<[_rollNumber: string], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "hashToCertificateId"
+  ): TypedContractMethod<[arg0: BytesLike], [bigint], "view">;
   getFunction(
     nameOrSignature: "issueCertificate"
   ): TypedContractMethod<
     [
-      _recipient: AddressLike,
+      _rollNumber: string,
       _name: string,
       _course: string,
       _institution: string,
@@ -390,12 +585,35 @@ export interface CertificateContract extends BaseContract {
     nameOrSignature: "revokeCertificate"
   ): TypedContractMethod<[_certificateId: BigNumberish], [void], "nonpayable">;
   getFunction(
+    nameOrSignature: "rollNumberCertificates"
+  ): TypedContractMethod<[arg0: string, arg1: BigNumberish], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "rollNumberExists"
+  ): TypedContractMethod<[arg0: string], [boolean], "view">;
+  getFunction(
     nameOrSignature: "transferOwnership"
   ): TypedContractMethod<[newOwner: AddressLike], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "verifyCertificate"
   ): TypedContractMethod<[_certificateId: BigNumberish], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "verifyCertificateByHash"
+  ): TypedContractMethod<[_documentHash: BytesLike], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "verifyCertificateByRollNumber"
+  ): TypedContractMethod<
+    [_rollNumber: string, _documentHash: BytesLike],
+    [boolean],
+    "view"
+  >;
 
+  getEvent(
+    key: "CertificateClaimed"
+  ): TypedContractEvent<
+    CertificateClaimedEvent.InputTuple,
+    CertificateClaimedEvent.OutputTuple,
+    CertificateClaimedEvent.OutputObject
+  >;
   getEvent(
     key: "CertificateIssued"
   ): TypedContractEvent<
@@ -412,7 +630,18 @@ export interface CertificateContract extends BaseContract {
   >;
 
   filters: {
-    "CertificateIssued(uint256,address,string,string,bytes32)": TypedContractEvent<
+    "CertificateClaimed(uint256,string,address)": TypedContractEvent<
+      CertificateClaimedEvent.InputTuple,
+      CertificateClaimedEvent.OutputTuple,
+      CertificateClaimedEvent.OutputObject
+    >;
+    CertificateClaimed: TypedContractEvent<
+      CertificateClaimedEvent.InputTuple,
+      CertificateClaimedEvent.OutputTuple,
+      CertificateClaimedEvent.OutputObject
+    >;
+
+    "CertificateIssued(uint256,string,string,string,bytes32)": TypedContractEvent<
       CertificateIssuedEvent.InputTuple,
       CertificateIssuedEvent.OutputTuple,
       CertificateIssuedEvent.OutputObject

@@ -12,19 +12,30 @@ import { Shield, ShieldCheck, ShieldX, Loader2, ExternalLink, Calendar, User, Gr
 interface VerificationResult {
   isValid: boolean;
   certificateData?: {
-    title: string | null;
-    description: string | null;
-    document_hash: string;
-    document_id: number;
-    owner_address: string | null;
-    blockchain_tx_hash: string | null;
-    created_at: string | null;
-    file_path: string | null;
-    is_completed: boolean | null;
+    // Fields from issued_certificates table
+    id?: string;
+    student_name?: string | null;
+    roll_number?: string | null;
+    course?: string | null;
+    certificate_id?: string | number;
+    certificate_hash?: string | null;
+    institution_wallet?: string | null;
+    blockchain_tx_hash?: string | null;
+    issued_at?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+    document_hash?: string | null;
+    
+    // Fields from documents table (fallback)
+    title?: string | null;
+    description?: string | null;
+    document_id?: number;
+    owner_address?: string | null;
+    file_path?: string | null;
+    is_completed?: boolean | null;
     current_signatures?: number;
     expires_at?: string | null;
     max_signatures?: number;
-    updated_at?: string | null;
   };
   blockchainValid?: boolean;
   databaseValid?: boolean;
@@ -45,7 +56,7 @@ const VerifyCertificate = () => {
 
   const { toast } = useToast();
 
-  const handleVerifyCertificate = async () => {
+ const handleVerifyCertificate = async () => {
   if (!selectedFile || !web3State.isConnected || !web3State.contract) {
     toast({
       variant: "destructive",
@@ -59,60 +70,76 @@ const VerifyCertificate = () => {
   setVerificationResult(null);
 
   try {
-    // Generate certificate hash first
+    // Generate hash
     const certificateHash = await generateSHA256Hash(selectedFile);
-    const bytes32Hash = hashToBytes32(certificateHash);
+    const hashVariants = {
+      noPrefix: certificateHash.startsWith("0x") ? certificateHash.slice(2) : certificateHash,
+      withPrefix: certificateHash.startsWith("0x") ? certificateHash : `0x${certificateHash}`,
+    };
+    console.log("🔍 Generated file hash (normalized):", hashVariants.noPrefix);
 
     // Database verification
     let dbData: any = null;
     let isDatabaseValid = false;
 
-    // First, check issued_certificates table
-    const { data: issuedCertData, error: issuedCertError } = await supabase
-      .from("issued_certificates")
-      .select("*")
-      .eq("certificate_hash", certificateHash)
-      .single();
+    const searchCombinations = [
+      { table: "issued_certificates", field: "certificate_hash", value: hashVariants.noPrefix },
+      { table: "issued_certificates", field: "certificate_hash", value: hashVariants.withPrefix },
+      { table: "issued_certificates", field: "document_hash", value: hashVariants.noPrefix },
+      { table: "issued_certificates", field: "document_hash", value: hashVariants.withPrefix },
+      { table: "documents", field: "document_hash", value: hashVariants.noPrefix },
+      { table: "documents", field: "document_hash", value: hashVariants.withPrefix },
+    ];
 
+    for (const combo of searchCombinations) {
+      console.log(`🔍 Querying ${combo.table}.${combo.field} = ${combo.value}`);
 
-      if (!issuedCertError && issuedCertData) {
-      dbData = issuedCertData;
-      isDatabaseValid = true;
-    } else {
-      // Fallback to documents table
-      const { data: documentsData, error: documentsError } = await supabase
-        .from("documents")
+      const { data, error } = await supabase
+        .from(combo.table)
         .select("*")
-        .eq("document_hash", certificateHash)
-        .single();
+        .eq(combo.field, combo.value);
 
-      if (!documentsError && documentsData) {
-        dbData = documentsData;
+      if (error) {
+        console.warn(`❌ Error querying ${combo.table}.${combo.field}:`, error.message);
+        continue;
+      }
+
+      if (data && data.length > 0) {
+        if (data.length > 1) {
+          console.warn(`⚠️ Multiple (${data.length}) matches found in ${combo.table}.${combo.field}`);
+          toast({
+            variant: "destructive",
+            title: "Duplicate Hash Detected",
+            description: `This hash exists in ${data.length} records of ${combo.table}. Using the first match.`,
+          });
+        }
+
+        dbData = data[0];
         isDatabaseValid = true;
+        console.log(`✅ Using record from ${combo.table}.${combo.field}`, dbData);
+        break;
+      } else {
+        console.log(`❌ No match for ${combo.table}.${combo.field} = ${combo.value}`);
       }
     }
 
-    // After fetching dbData from the database
-    const certificateId = dbData?.certificate_id;
-
     // Blockchain verification
+    const certificateId = dbData?.certificate_id;
     let isBlockchainValid = false;
-    if (certificateId) {
-       try {
-        isBlockchainValid = await web3State.contract.verifyCertificate(certificateId);  
-    } catch (err) {
-      console.error("Blockchain verification failed:", err);
-      isBlockchainValid = false;
-    }
-    }else{
-      console.warn("Certificate ID not found, skipping blockchain verification.");
-    }
-   
 
+    if (certificateId) {
+      try {
+        isBlockchainValid = await web3State.contract.verifyCertificate(certificateId);
+      } catch (err) {
+        console.error("Blockchain verification failed:", err);
+      }
+    } else {
+      console.warn("⚠️ No certificate ID found, skipping blockchain verification.");
+    }
 
     const isValid = isBlockchainValid && isDatabaseValid;
 
-    // Log verification attempt
+    // Log verification
     try {
       const rawHash =
         dbData?.certificate_hash ||
@@ -123,14 +150,7 @@ const VerifyCertificate = () => {
       const formattedHash =
         rawHash && !rawHash.startsWith("0x") ? `0x${rawHash}` : rawHash;
 
-      const logData: {
-        document_hash: string | null;
-        verifier_address: string | null;
-        verification_type: string;
-        is_valid: boolean;
-        details: any;
-        document_id?: string | number;
-      } = {
+      const logData: any = {
         document_hash: formattedHash,
         verifier_address: web3State.account,
         verification_type: "certificate_authenticity",
@@ -154,13 +174,12 @@ const VerifyCertificate = () => {
       }
 
       await supabase.from("verification_logs").insert(logData);
-      console.log("Verification logged successfully");
+      console.log("✅ Verification logged successfully");
     } catch (logError: unknown) {
-      console.warn("Failed to log verification:", logError);
-      console.warn("Continuing verification despite logging failure");
+      console.warn("⚠️ Failed to log verification:", logError);
     }
 
-    // Set verification result
+    // Save result
     setVerificationResult({
       isValid,
       certificateData: dbData || undefined,
@@ -189,7 +208,10 @@ const VerifyCertificate = () => {
 };
 
 
-  const formatDate = (dateString: string | null) => {
+
+
+
+  const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -334,24 +356,24 @@ const VerifyCertificate = () => {
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4 text-muted-foreground" />
                         <div>
-                          <p className="text-sm text-muted-foreground">Document Title</p>
-                          <p className="font-medium">{verificationResult.certificateData.title || 'N/A'}</p>
+                          <p className="text-sm text-muted-foreground">Student Name</p>
+                          <p className="font-medium">{verificationResult.certificateData.student_name || verificationResult.certificateData.title || 'N/A'}</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <Hash className="w-4 h-4 text-muted-foreground" />
                         <div>
-                          <p className="text-sm text-muted-foreground">Document ID</p>
-                          <p className="font-medium">{verificationResult.certificateData.document_id}</p>
+                          <p className="text-sm text-muted-foreground">Certificate ID</p>
+                          <p className="font-medium">{verificationResult.certificateData.certificate_id || verificationResult.certificateData.document_id}</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <GraduationCap className="w-4 h-4 text-muted-foreground" />
                         <div>
-                          <p className="text-sm text-muted-foreground">Description</p>
-                          <p className="font-medium">{verificationResult.certificateData.description || 'N/A'}</p>
+                          <p className="text-sm text-muted-foreground">Course</p>
+                          <p className="font-medium">{verificationResult.certificateData.course || verificationResult.certificateData.description || 'N/A'}</p>
                         </div>
                       </div>
 
@@ -366,7 +388,7 @@ const VerifyCertificate = () => {
                       <div className="col-span-full">
                         <p className="text-sm text-muted-foreground mb-1">Document Hash</p>
                         <p className="font-mono text-sm bg-muted p-2 rounded break-all">
-                          {verificationResult.certificateData.document_hash}
+                          {verificationResult.certificateData.document_hash || verificationResult.certificateData.certificate_hash}
                         </p>
                       </div>
 

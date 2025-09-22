@@ -1,5 +1,5 @@
 {
-  "address": "0x91955EaEDcE878be203030b84C792a035391a3F7",
+  "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   "abi": [
     {
       "inputs": [],
@@ -17,9 +17,34 @@
         },
         {
           "indexed": true,
+          "internalType": "string",
+          "name": "rollNumber",
+          "type": "string"
+        },
+        {
+          "indexed": true,
           "internalType": "address",
           "name": "recipient",
           "type": "address"
+        }
+      ],
+      "name": "CertificateClaimed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "certificateId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "string",
+          "name": "rollNumber",
+          "type": "string"
         },
         {
           "indexed": false,
@@ -32,6 +57,12 @@
           "internalType": "string",
           "name": "course",
           "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "documentHash",
+          "type": "bytes32"
         }
       ],
       "name": "CertificateIssued",
@@ -66,6 +97,11 @@
           "type": "uint256"
         },
         {
+          "internalType": "string",
+          "name": "rollNumber",
+          "type": "string"
+        },
+        {
           "internalType": "address",
           "name": "recipient",
           "type": "address"
@@ -94,9 +130,37 @@
           "internalType": "bool",
           "name": "isValid",
           "type": "bool"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "documentHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bool",
+          "name": "isClaimed",
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_rollNumber",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_certificateId",
+          "type": "uint256"
+        }
+      ],
+      "name": "claimCertificate",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -115,6 +179,11 @@
               "internalType": "uint256",
               "name": "id",
               "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "rollNumber",
+              "type": "string"
             },
             {
               "internalType": "address",
@@ -144,6 +213,87 @@
             {
               "internalType": "bool",
               "name": "isValid",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "documentHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bool",
+              "name": "isClaimed",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct CertificateContract.Certificate",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "_documentHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getCertificateByHash",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "id",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "rollNumber",
+              "type": "string"
+            },
+            {
+              "internalType": "address",
+              "name": "recipient",
+              "type": "address"
+            },
+            {
+              "internalType": "string",
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "course",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "institution",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "dateIssued",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "isValid",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "documentHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bool",
+              "name": "isClaimed",
               "type": "bool"
             }
           ],
@@ -175,6 +325,25 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_rollNumber",
+          "type": "string"
+        }
+      ],
+      "name": "getRollNumberCertificates",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "getTotalCertificates",
       "outputs": [
@@ -190,9 +359,47 @@
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "_recipient",
-          "type": "address"
+          "internalType": "string",
+          "name": "_rollNumber",
+          "type": "string"
+        }
+      ],
+      "name": "hasRollNumber",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "name": "hashToCertificateId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_rollNumber",
+          "type": "string"
         },
         {
           "internalType": "string",
@@ -213,6 +420,11 @@
           "internalType": "uint256",
           "name": "_dateIssued",
           "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_documentHash",
+          "type": "bytes32"
         }
       ],
       "name": "issueCertificate",
@@ -292,6 +504,49 @@
     {
       "inputs": [
         {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "rollNumberCertificates",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "name": "rollNumberExists",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "address",
           "name": "newOwner",
           "type": "address"
@@ -320,15 +575,58 @@
       ],
       "stateMutability": "view",
       "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "_documentHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "verifyCertificateByHash",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_rollNumber",
+          "type": "string"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_documentHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "verifyCertificateByRollNumber",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     }
   ],
   "contractName": "CertificateContract",
-  "sourceName": "contracts/CertificateContract.sol",
+  "sourceName": "contracts/CertificateV2.sol",
   "deploymentInfo": {
-    "deployer": "0x4d4ea9a2980CF5c159933Fa025E98eA2359E5f3E",
-    "network": "ganache",
-    "chainId": "1337",
-    "timestamp": "2025-09-11T13:39:30.328Z",
-    "blockNumber": 3
+    "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "network": "hardhat",
+    "chainId": "31337",
+    "timestamp": "2025-09-22T05:29:47.316Z",
+    "blockNumber": 1
   }
 }

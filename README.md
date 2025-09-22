@@ -183,3 +183,155 @@ If you encounter any issues or have questions:
 ---
 
 **Made with ❤️ for secure certificate verification**
+```
+cert-check-chain-main
+├─ .env
+├─ bun.lockb
+├─ components.json
+├─ contracts
+│  ├─ CerificateV2.sol
+│  ├─ Certificate.sol
+│  ├─ CertificateContract.sol
+│  └─ Counter.sol
+├─ eslint.config.js
+├─ hardhat.config.ts
+├─ hardhat.tsconfig.json
+├─ ignition
+│  └─ modules
+│     └─ Counter.ts
+├─ index.html
+├─ package-lock.json
+├─ package.json
+├─ postcss.config.js
+├─ public
+│  ├─ placeholder.svg
+│  └─ robots.txt
+├─ README.md
+├─ scripts
+│  ├─ check-deployment.js
+│  ├─ deploy-certificate-v2.js
+│  ├─ deploy-certificate.js
+│  ├─ deploy-certificate.ts
+│  ├─ deploy-simple.js
+│  ├─ deploy.ts
+│  ├─ send-op-tx.ts
+│  ├─ test-connection.js
+│  └─ verify-certificate-deployment.ts
+├─ src
+│  ├─ App.css
+│  ├─ App.tsx
+│  ├─ components
+│  │  ├─ FileUpload.tsx
+│  │  ├─ ui
+│  │  │  ├─ accordion.tsx
+│  │  │  ├─ alert-dialog.tsx
+│  │  │  ├─ alert.tsx
+│  │  │  ├─ aspect-ratio.tsx
+│  │  │  ├─ avatar.tsx
+│  │  │  ├─ badge.tsx
+│  │  │  ├─ breadcrumb.tsx
+│  │  │  ├─ button.tsx
+│  │  │  ├─ calendar.tsx
+│  │  │  ├─ card.tsx
+│  │  │  ├─ carousel.tsx
+│  │  │  ├─ chart.tsx
+│  │  │  ├─ checkbox.tsx
+│  │  │  ├─ collapsible.tsx
+│  │  │  ├─ command.tsx
+│  │  │  ├─ context-menu.tsx
+│  │  │  ├─ dialog.tsx
+│  │  │  ├─ drawer.tsx
+│  │  │  ├─ dropdown-menu.tsx
+│  │  │  ├─ form.tsx
+│  │  │  ├─ hover-card.tsx
+│  │  │  ├─ input-otp.tsx
+│  │  │  ├─ input.tsx
+│  │  │  ├─ label.tsx
+│  │  │  ├─ menubar.tsx
+│  │  │  ├─ navigation-menu.tsx
+│  │  │  ├─ pagination.tsx
+│  │  │  ├─ popover.tsx
+│  │  │  ├─ progress.tsx
+│  │  │  ├─ radio-group.tsx
+│  │  │  ├─ resizable.tsx
+│  │  │  ├─ scroll-area.tsx
+│  │  │  ├─ select.tsx
+│  │  │  ├─ separator.tsx
+│  │  │  ├─ sheet.tsx
+│  │  │  ├─ sidebar.tsx
+│  │  │  ├─ skeleton.tsx
+│  │  │  ├─ slider.tsx
+│  │  │  ├─ sonner.tsx
+│  │  │  ├─ switch.tsx
+│  │  │  ├─ table.tsx
+│  │  │  ├─ tabs.tsx
+│  │  │  ├─ textarea.tsx
+│  │  │  ├─ toast.tsx
+│  │  │  ├─ toaster.tsx
+│  │  │  ├─ toggle-group.tsx
+│  │  │  ├─ toggle.tsx
+│  │  │  ├─ tooltip.tsx
+│  │  │  └─ use-toast.ts
+│  │  └─ WalletConnect.tsx
+│  ├─ contracts
+│  │  ├─ package-lock.json
+│  │  └─ package.json
+│  ├─ hooks
+│  │  ├─ use-mobile.tsx
+│  │  └─ use-toast.ts
+│  ├─ index.css
+│  ├─ integrations
+│  │  └─ supabase
+│  │     └─ client.ts
+│  ├─ lib
+│  │  ├─ contract-config.json
+│  │  ├─ crypto.ts
+│  │  ├─ utils.ts
+│  │  └─ web3.ts
+│  ├─ main.tsx
+│  ├─ pages
+│  │  ├─ Home.tsx
+│  │  ├─ Index.tsx
+│  │  ├─ IssueCertificate.tsx
+│  │  ├─ NotFound.tsx
+│  │  └─ VerifyCertificate.tsx
+│  ├─ scripts
+│  │  └─ deploy.ts
+│  └─ vite-env.d.ts
+├─ supabase
+│  ├─ config.toml
+│  └─ migrations
+│     └─ 20250902173033_f1a5b8ce-260c-498c-b65f-9d4e772052dc.sql
+├─ tailwind.config.ts
+├─ test
+│  ├─ Counter.ts
+│  └─ foundry
+│     └─ Counter.t.sol
+├─ tsconfig.app.json
+├─ tsconfig.json
+├─ tsconfig.node.json
+├─ typechain-types
+│  ├─ CerificateV2.sol
+│  │  ├─ CertificateContract.ts
+│  │  └─ index.ts
+│  ├─ Certificate.sol
+│  │  ├─ CertificateContract.ts
+│  │  └─ index.ts
+│  ├─ CertificateContract.ts
+│  ├─ common.ts
+│  ├─ Counter.ts
+│  ├─ factories
+│  │  ├─ CerificateV2.sol
+│  │  │  ├─ CertificateContract__factory.ts
+│  │  │  └─ index.ts
+│  │  ├─ Certificate.sol
+│  │  │  ├─ CertificateContract__factory.ts
+│  │  │  └─ index.ts
+│  │  ├─ CertificateContract__factory.ts
+│  │  ├─ Counter__factory.ts
+│  │  └─ index.ts
+│  ├─ hardhat.d.ts
+│  └─ index.ts
+└─ vite.config.ts
+
+```

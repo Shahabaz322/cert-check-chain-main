@@ -14,7 +14,7 @@ import { FileCheck, Loader2, ExternalLink } from 'lucide-react';
 import { getAddress, isAddress } from "ethers";
 
 interface CertificateForm {
-  recipientAddress: string;
+  rollNumber: string;
   studentName: string;
   course: string;
   institution: string;
@@ -34,7 +34,7 @@ const IssueCertificate = () => {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [form, setForm] = useState<CertificateForm>({
-    recipientAddress: '',
+    rollNumber: '',
     studentName: '',
     course: '',
     institution: '',
@@ -56,11 +56,10 @@ const IssueCertificate = () => {
   const validateForm = (): string | null => {
     if (!selectedFile) return "Please upload a certificate file";
     if (!form.studentName.trim()) return "Student name is required";
-    if (!form.recipientAddress.trim()) return "Recipient address is required";
+    if (!form.rollNumber.trim()) return "Roll number is required";
     if (!form.course.trim()) return "Course name is required";
     if (!form.institution.trim()) return "Institution name is required";
     if (!form.dateIssued) return "Date issued is required";
-    if (!isAddress(form.recipientAddress)) return "Invalid Ethereum address";
     if (!web3State.isConnected) return "Please connect your wallet";
 
     const dateTimestamp = new Date(form.dateIssued).getTime();
@@ -86,7 +85,7 @@ const IssueCertificate = () => {
 
     setIsIssuing(true);
     try {
-      const normalizedRecipientAddress = getAddress(form.recipientAddress);
+      //const normalizedRecipientAddress = getAddress(form.recipientAddress);
       const dateTimestamp = Math.floor(new Date(form.dateIssued).getTime() / 1000);
 
       // Generate pure SHA256 hash for the file
@@ -103,7 +102,7 @@ const IssueCertificate = () => {
 
       // Issue certificate on blockchain (5 parameters only)
       const tx = await web3State.contract.issueCertificate(
-        normalizedRecipientAddress,
+        form.rollNumber,
         form.studentName,
         form.course,
         form.institution,
@@ -150,7 +149,7 @@ const IssueCertificate = () => {
         .from("issued_certificates")
         .insert({
           student_name: form.studentName,
-          roll_number: form.certificateId || "N/A", // Roll number or N/A if not provided
+          roll_number: form.rollNumber,
           course: form.course,
           certificate_id: certificateIdToStore, // Use unique ID
           certificate_hash: certificateHash, // This can be the composite hash
@@ -223,7 +222,7 @@ const IssueCertificate = () => {
 
         // Reset form
         setForm({
-          recipientAddress: '',
+          rollNumber: '',
           studentName: '',
           course: '',
           institution: '',
@@ -296,8 +295,8 @@ const IssueCertificate = () => {
                 <Input id="student-name" placeholder="Enter full name" value={form.studentName} onChange={(e) => handleFormChange('studentName', e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="recipient-address">Recipient Address *</Label>
-                <Input id="recipient-address" placeholder="0x..." value={form.recipientAddress} onChange={(e) => handleFormChange('recipientAddress', e.target.value)} />
+                <Label htmlFor="roll-number">Roll Number *</Label>
+                <Input id="roll-number" placeholder="Enter roll number" value={form.rollNumber} onChange={(e) => handleFormChange('rollNumber', e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="course">Course/Program *</Label>

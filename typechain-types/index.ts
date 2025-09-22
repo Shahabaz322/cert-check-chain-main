@@ -3,6 +3,8 @@
 /* eslint-disable */
 import type * as certificateSol from "./Certificate.sol";
 export type { certificateSol };
+import type * as certificateV2Sol from "./CertificateV2.sol";
+export type { certificateV2Sol };
 export type { CertificateContract } from "./CertificateContract";
 export type { Counter } from "./Counter";
 export * as factories from "./factories";
