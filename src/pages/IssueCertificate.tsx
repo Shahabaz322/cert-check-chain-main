@@ -404,36 +404,83 @@ Generated on: ${new Date().toISOString()}
         description: "PDF with QR, QR image, and hash verification file downloaded",
       });
 
-      // Step 6: Validate contract before blockchain transaction
+      // Step 6: Enhanced contract validation and debugging
       setCurrentStep('Validating smart contract...');
       
-      // Check if contract has the expected function
-      if (!web3State.contract.issueCertificate) {
-        throw new Error("Contract does not have issueCertificate function. Please check contract deployment.");
+      // Get contract address and code
+      const contractAddress = typeof web3State.contract.address === 'string'
+        ? web3State.contract.address
+        : (typeof web3State.contract.target === 'string' ? web3State.contract.target : '');
+      const contractCode = contractAddress
+        ? await web3State.provider?.getCode(contractAddress)
+        : undefined;
+      
+      console.log('Contract Debug Info:', {
+        contractAddress,
+        codeExists: contractCode !== '0x',
+        codeLength: contractCode?.length,
+        hasFunction: !!web3State.contract.issueCertificate,
+        contractInterface: web3State.contract.interface?.fragments?.map((f: any) => f.name) || 'No interface',
+        currentAccount: web3State.account
+      });
+
+      // Check contract owner
+      try {
+        const contractOwner = await web3State.contract.owner();
+        console.log('Contract Ownership Info:', {
+          contractOwner,
+          currentAccount: web3State.account,
+          isOwner: contractOwner?.toLowerCase() === web3State.account?.toLowerCase()
+        });
+
+        if (contractOwner?.toLowerCase() !== web3State.account?.toLowerCase()) {
+          throw new Error(`Access denied: You are not the contract owner. Contract owner: ${contractOwner}, Your account: ${web3State.account}`);
+        }
+      } catch (ownerError: any) {
+        if (ownerError.message.includes('Access denied')) {
+          throw ownerError;
+        }
+        console.warn('Could not check contract owner:', ownerError);
       }
 
-      // Validate contract address
-      const contractCode = await web3State.provider?.getCode(web3State.contract.target || web3State.contract.address);
       if (!contractCode || contractCode === '0x') {
-        throw new Error("No contract found at the specified address. Please check contract deployment.");
+        throw new Error(`No contract deployed at address ${contractAddress}. Please check your contract deployment.`);
       }
 
-      // Prepare transaction parameters with validation
+      if (!web3State.contract.issueCertificate) {
+        throw new Error("Contract does not have issueCertificate function. Available functions: " + 
+          (web3State.contract.interface?.fragments?.map((f: any) => f.name)?.join(', ') || 'Unknown'));
+      }
+
+      // Prepare and validate transaction parameters
       const dateTimestamp = Math.floor(new Date(form.dateIssued).getTime() / 1000);
       const bytes32Hash = stringToBytes32(textHash);
 
-      // Log parameters for debugging
-      console.log('Contract parameters:', {
-        rollNumber: form.rollNumber,
-        studentName: form.studentName,
-        course: form.course,
-        institution: form.institution,
+      // Enhanced parameter logging
+      const params = [
+        form.rollNumber,
+        form.studentName,
+        form.course,
+        form.institution,
         dateTimestamp,
-        bytes32Hash,
-        contractAddress: web3State.contract.target || web3State.contract.address
+        bytes32Hash
+      ];
+
+      console.log('Detailed Contract Call Info:', {
+        contractAddress,
+        functionName: 'issueCertificate',
+        parameters: {
+          rollNumber: `"${form.rollNumber}" (length: ${form.rollNumber.length})`,
+          studentName: `"${form.studentName}" (length: ${form.studentName.length})`,
+          course: `"${form.course}" (length: ${form.course.length})`,
+          institution: `"${form.institution}" (length: ${form.institution.length})`,
+          dateTimestamp: `${dateTimestamp} (${new Date(dateTimestamp * 1000).toISOString()})`,
+          bytes32Hash: `${bytes32Hash} (length: ${bytes32Hash.length})`
+        },
+        rawParams: params
       });
 
-      // Step 7: Issue on blockchain with enhanced error handling
+      // Step 7: Try different approaches based on potential issues
       setCurrentStep('Issuing certificate on blockchain...');
 
       toast({
@@ -441,39 +488,96 @@ Generated on: ${new Date().toISOString()}
         description: "Please confirm the transaction in your wallet...",
       });
 
-      // Try to estimate gas first to catch errors early
+      // Method 1: Try with explicit gas limit
+      let tx;
       try {
-        const gasEstimate = await web3State.contract.issueCertificate.estimateGas(
+        setCurrentStep('Attempting transaction with gas limit...');
+        
+        // Try with a reasonable gas limit first
+        tx = await web3State.contract.issueCertificate(
           form.rollNumber,
           form.studentName,
           form.course,
           form.institution,
           dateTimestamp,
-          bytes32Hash
+          bytes32Hash,
+          { gasLimit: 500000 }
         );
-        console.log('Gas estimate:', gasEstimate.toString());
-      } catch (gasError: any) {
-        console.error('Gas estimation failed:', gasError);
         
-        // Provide more specific error messages
-        if (gasError.message.includes('missing revert data')) {
-          throw new Error("Contract function call failed. This might be due to: 1) Contract not deployed correctly, 2) Function signature mismatch, 3) Invalid parameters, or 4) Contract access restrictions.");
-        } else if (gasError.message.includes('revert')) {
-          throw new Error("Transaction would fail with revert. Check contract conditions and parameters.");
-        } else {
-          throw new Error(`Gas estimation failed: ${gasError.message}`);
+        console.log('Transaction successful with gas limit:', tx.hash);
+        
+      } catch (gasLimitError: any) {
+        console.error('Gas limit method failed:', gasLimitError);
+        
+        // Method 2: Try gas estimation with detailed error analysis
+        try {
+          setCurrentStep('Analyzing gas estimation failure...');
+          
+          const gasEstimate = await web3State.contract.issueCertificate.estimateGas(
+            form.rollNumber,
+            form.studentName,
+            form.course,
+            form.institution,
+            dateTimestamp,
+            bytes32Hash
+          );
+          
+          console.log('Gas estimate succeeded:', gasEstimate.toString());
+          
+          // If estimation works, execute with estimated gas
+          tx = await web3State.contract.issueCertificate(
+            form.rollNumber,
+            form.studentName,
+            form.course,
+            form.institution,
+            dateTimestamp,
+            bytes32Hash,
+            { gasLimit: gasEstimate }
+          );
+          
+        } catch (estimateError: any) {
+          console.error('Gas estimation detailed analysis:', {
+            error: estimateError,
+            errorMessage: estimateError.message,
+            errorCode: estimateError.code,
+            errorData: estimateError.data,
+            transaction: estimateError.transaction
+          });
+          
+          // Method 3: Try calling a view function first to test contract connectivity
+          try {
+            setCurrentStep('Testing contract connectivity...');
+            
+            // Check if contract has any view functions we can test
+            if (web3State.contract.verifyCertificate) {
+              await web3State.contract.verifyCertificate(1); // Test with dummy ID
+              console.log('Contract connectivity test passed');
+            }
+            
+            // If we get here, the contract exists but our function call is invalid
+            throw new Error(`Function call parameters are invalid. Check that your smart contract expects these exact parameter types and values. Contract is reachable but rejecting the transaction.`);
+            
+          } catch (connectivityError: any) {
+            console.error('Contract connectivity test failed:', connectivityError);
+            
+            // Final detailed error with all debugging info
+            throw new Error(`Smart contract issue detected:
+            
+1. Contract Address: ${contractAddress}
+2. Contract Code Exists: ${contractCode !== '0x'}
+3. Function Available: ${!!web3State.contract.issueCertificate}
+4. Network: ${await web3State.provider?.getNetwork().then(n => n.name).catch(() => 'Unknown')}
+
+Root Cause: ${estimateError.message}
+
+Suggested Actions:
+- Verify contract is deployed to the correct network
+- Check if function signature matches exactly
+- Ensure your wallet has permission to call this function
+- Verify contract constructor parameters if using access control`);
+          }
         }
       }
-
-      // Execute the transaction
-      const tx = await web3State.contract.issueCertificate(
-        form.rollNumber,
-        form.studentName,
-        form.course,
-        form.institution,
-        dateTimestamp,
-        bytes32Hash
-      );
 
       toast({
         title: "Transaction Submitted",
