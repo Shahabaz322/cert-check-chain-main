@@ -3,28 +3,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { FileUpload } from '@/components/FileUpload';
 import { WalletConnect } from '@/components/WalletConnect';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client.ts';
 import { Web3State } from '@/lib/web3';
-import { FileCheck, Loader2, ExternalLink, Eye, QrCode, FileText, Hash, Image, AlertTriangle } from 'lucide-react';
+import { FileCheck, Loader2, ExternalLink } from 'lucide-react';
 
 // Real library imports
-//import * as pdfjsLib from 'pdfjs-dist';
 import Tesseract from 'tesseract.js';
 import QRCode from 'qrcode';
 import { PDFDocument } from 'pdf-lib';
-// Use worker from pdfjs-dist for Vite/React projects
-import { getDocument ,GlobalWorkerOptions } from 'pdfjs-dist';
-// @ts-ignore
-//import pdfWorker from 'pdfjs-dist/build/pdf.worker.js';
-import { get } from 'http';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 
-// FIX 1: Correct PDF.js worker configuration
-// Use the correct CDN URL for the worker
-//pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/pdf.worker.min.js';
+// PDF.js worker configuration
 GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/pdf.worker.min.mjs';
 
 interface CertificateForm {
@@ -34,16 +26,6 @@ interface CertificateForm {
   institution: string;
   dateIssued: string;
   certificateId: string;
-  description?: string;
-}
-
-interface ProcessingSteps {
-  fileUploaded: boolean;
-  textExtracted: boolean;
-  hashGenerated: boolean;
-  qrGenerated: boolean;
-  qrEmbedded: boolean;
-  blockchainIssued: boolean;
 }
 
 interface OCRResult {
@@ -51,14 +33,8 @@ interface OCRResult {
   confidence: number;
   method: 'text-pdf' | 'image-ocr' | 'hybrid';
   pageCount: number;
-  processingTime?: number;
+  processingTime: number;
   errors?: string[];
-}
-
-interface ProcessingProgress {
-  stage: string;
-  progress: number;
-  message: string;
 }
 
 const IssueCertificate = () => {
@@ -77,30 +53,13 @@ const IssueCertificate = () => {
     course: '',
     institution: '',
     dateIssued: new Date().toISOString().split('T')[0],
-    certificateId: '',
-    description: ''
+    certificateId: ''
   });
 
-  const [processingSteps, setProcessingSteps] = useState<ProcessingSteps>({
-    fileUploaded: false,
-    textExtracted: false,
-    hashGenerated: false,
-    qrGenerated: false,
-    qrEmbedded: false,
-    blockchainIssued: false
-  });
-
-  const [extractedText, setExtractedText] = useState<string>('');
-  const [ocrResult, setOcrResult] = useState<OCRResult | null>(null);
-  const [textHash, setTextHash] = useState<string>('');
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
-  const [processedPdfUrl, setProcessedPdfUrl] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
   const [issuedTxHash, setIssuedTxHash] = useState<string | null>(null);
   const [issuedCertificateId, setIssuedCertificateId] = useState<string | null>(null);
-  const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null);
-  const [processingErrors, setProcessingErrors] = useState<string[]>([]);
+  const [currentStep, setCurrentStep] = useState<string>('');
 
   const { toast } = useToast();
 
@@ -108,125 +67,100 @@ const IssueCertificate = () => {
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
-  
+  const extractTextFromPDF = async (file: File, form: any): Promise<OCRResult> => {
+    const startTime = Date.now();
+    const errors: string[] = [];
 
-interface OCRResult {
-  extractedText: string;
-  confidence: number;
-  method: 'text-pdf' | 'image-ocr' | 'hybrid';
-  pageCount: number;
-  processingTime: number;
-  errors?: string[];
-}
-
-const extractTextFromPDF = async (file: File, form: any, setProcessingProgress: Function): Promise<OCRResult> => {
-  const startTime = Date.now();
-  const errors: string[] = [];
-
-  try {
-    setProcessingProgress({ stage: 'Loading PDF', progress: 10, message: 'Reading PDF file...' });
-
-    if (file.size > 50 * 1024 * 1024) {
-      throw new Error('File size too large. Please use a PDF smaller than 50MB.');
-    }
-
-    const arrayBuffer = await file.arrayBuffer();
-
-    setProcessingProgress({ stage: 'Parsing PDF', progress: 20, message: 'Analyzing PDF structure...' });
-
-    let pdf;
     try {
-      pdf = await getDocument({ data: arrayBuffer }).promise;
-    } catch (pdfError: any) {
-      console.error('PDF loading error:', pdfError);
-      errors.push(`PDF parsing issue: ${pdfError.message || 'Unknown error'}`);
+      setCurrentStep('Loading PDF file...');
 
-      // fallback attempt
+      if (file.size > 50 * 1024 * 1024) {
+        throw new Error('File size too large. Please use a PDF smaller than 50MB.');
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      setCurrentStep('Parsing PDF structure...');
+
+      let pdf;
       try {
         pdf = await getDocument({ data: arrayBuffer }).promise;
-      } catch {
-        throw new Error('Unable to load PDF. Please ensure the file is not corrupted.');
-      }
-    }
-
-    let extractedText = '';
-    let method: 'text-pdf' | 'image-ocr' | 'hybrid' = 'text-pdf';
-    let confidence = 0;
-    const pageCount = pdf.numPages;
-
-    setProcessingProgress({ stage: 'Extracting Text', progress: 30, message: `Processing ${pageCount} pages...` });
-
-    for (let i = 1; i <= pageCount; i++) {
-      try {
-        setProcessingProgress({
-          stage: 'Extracting Text',
-          progress: 30 + (40 * i / pageCount),
-          message: `Processing page ${i}/${pageCount}...`
-        });
-
-        const page = await pdf.getPage(i);
-
-        // Try text extraction first
-        let pageText = '';
+      } catch (pdfError: any) {
+        console.error('PDF loading error:', pdfError);
+        errors.push(`PDF parsing issue: ${pdfError.message || 'Unknown error'}`);
+        
         try {
-          const textContent = await page.getTextContent();
-          pageText = textContent.items.map((item: any) => item.str).join(' ').trim();
-        } catch (textError: any) {
-          errors.push(`Text extraction failed on page ${i}: ${textError.message}`);
+          pdf = await getDocument({ data: arrayBuffer }).promise;
+        } catch {
+          throw new Error('Unable to load PDF. Please ensure the file is not corrupted.');
         }
+      }
 
-        if (pageText.length > 50) {
-          extractedText += pageText + '\n';
-          method = 'text-pdf';
-          confidence = Math.max(confidence, 95);
-        } else {
-          // Fallback to OCR
+      let extractedText = '';
+      let method: 'text-pdf' | 'image-ocr' | 'hybrid' = 'text-pdf';
+      let confidence = 0;
+      const pageCount = pdf.numPages;
+
+      setCurrentStep(`Processing ${pageCount} pages...`);
+
+      for (let i = 1; i <= pageCount; i++) {
+        try {
+          setCurrentStep(`Processing page ${i}/${pageCount}...`);
+
+          const page = await pdf.getPage(i);
+
+          // Try text extraction first
+          let pageText = '';
           try {
-            setProcessingProgress({
-              stage: 'OCR Processing',
-              progress: 30 + (40 * i / pageCount),
-              message: `OCR processing page ${i}/${pageCount}...`
-            });
+            const textContent = await page.getTextContent();
+            pageText = textContent.items.map((item: any) => item.str).join(' ').trim();
+          } catch (textError: any) {
+            errors.push(`Text extraction failed on page ${i}: ${textError.message}`);
+          }
 
-            const viewport = page.getViewport({ scale: 2.0 });
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
+          if (pageText.length > 50) {
+            extractedText += pageText + '\n';
+            method = 'text-pdf';
+            confidence = Math.max(confidence, 95);
+          } else {
+            // Fallback to OCR
+            try {
+              setCurrentStep(`OCR processing page ${i}/${pageCount}...`);
 
-            if (!context) throw new Error('Canvas context not available');
+              const viewport = page.getViewport({ scale: 2.0 });
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
 
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
+              if (!context) throw new Error('Canvas context not available');
 
-            await page.render({ canvasContext: context, viewport,canvas }).promise;
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
 
-            const { data: { text, confidence: ocrConfidence } } = await Tesseract.recognize(
-              canvas,
-              'eng',
-              {
-                logger: m => {
-                  if (m.status === 'recognizing text') {
-                    setProcessingProgress({
-                      stage: 'OCR Processing',
-                      progress: 30 + (40 * (i - 1 + m.progress) / pageCount),
-                      message: `OCR on page ${i}: ${Math.round(m.progress * 100)}%`
-                    });
+              await page.render({ canvasContext: context, viewport, canvas }).promise;
+
+              const { data: { text, confidence: ocrConfidence } } = await Tesseract.recognize(
+                canvas,
+                'eng',
+                {
+                  logger: m => {
+                    if (m.status === 'recognizing text') {
+                      setCurrentStep(`OCR on page ${i}: ${Math.round(m.progress * 100)}%`);
+                    }
                   }
                 }
+              );
+
+              if (text.trim().length > 10) {
+                extractedText += text.trim() + '\n';
+                method = pageText.length > 0 ? 'hybrid' : 'image-ocr';
+                confidence = Math.max(confidence, Math.min(ocrConfidence, 95));
+              } else {
+                errors.push(`OCR produced minimal text on page ${i}`);
               }
-            );
 
-            if (text.trim().length > 10) {
-              extractedText += text.trim() + '\n';
-              method = pageText.length > 0 ? 'hybrid' : 'image-ocr';
-              confidence = Math.max(confidence, Math.min(ocrConfidence, 95));
-            } else {
-              errors.push(`OCR produced minimal text on page ${i}`);
-            }
-
-          } catch (ocrError: any) {
-            errors.push(`OCR failed on page ${i}: ${ocrError.message}`);
-            if (i === 1 && extractedText.length < 50) {
-              const fallbackText = `
+            } catch (ocrError: any) {
+              errors.push(`OCR failed on page ${i}: ${ocrError.message}`);
+              if (i === 1 && extractedText.length < 50) {
+                const fallbackText = `
 CERTIFICATE DOCUMENT
 
 Student: ${form.studentName || '[Student Name]'}
@@ -236,40 +170,33 @@ Institution: ${form.institution || '[Institution Name]'}
 Date Issued: ${form.dateIssued || '[Issue Date]'}
 
 [Text extracted via fallback method - Original PDF may be image-based]
-              `.trim();
+                `.trim();
 
-              extractedText = fallbackText;
-              method = 'image-ocr';
-              confidence = 60;
-              errors.push('Used form data as fallback due to OCR failure');
+                extractedText = fallbackText;
+                method = 'image-ocr';
+                confidence = 60;
+                errors.push('Used form data as fallback due to OCR failure');
+              }
             }
           }
+        } catch (pageError: any) {
+          errors.push(`Page ${i} processing failed: ${pageError.message}`);
         }
-      } catch (pageError: any) {
-        errors.push(`Page ${i} processing failed: ${pageError.message}`);
       }
-    }
 
-    if (extractedText.trim().length < 20) {
-      throw new Error('Insufficient text extracted from PDF. Please ensure the PDF contains readable text.');
-    }
+      if (extractedText.trim().length < 20) {
+        throw new Error('Insufficient text extracted from PDF. Please ensure the PDF contains readable text.');
+      }
 
-    const processingTime = Date.now() - startTime;
+      const processingTime = Date.now() - startTime;
+      return { extractedText: extractedText.trim(), confidence, method, pageCount, processingTime, errors: errors.length ? errors : undefined };
 
-    setProcessingProgress({
-      stage: 'Complete',
-      progress: 100,
-      message: 'Text extraction completed successfully'
-    });
+    } catch (error: any) {
+      const processingTime = Date.now() - startTime;
+      errors.push(`Primary extraction failed: ${error.message}`);
+      errors.push('Using emergency fallback text generation');
 
-    return { extractedText: extractedText.trim(), confidence, method, pageCount, processingTime, errors: errors.length ? errors : undefined };
-
-  } catch (error: any) {
-    const processingTime = Date.now() - startTime;
-    errors.push(`Primary extraction failed: ${error.message}`);
-    errors.push('Using emergency fallback text generation');
-
-    const fallbackText = `
+      const fallbackText = `
 CERTIFICATE VERIFICATION DOCUMENT
 
 Student Name: ${form.studentName || '[Please verify student name]'}
@@ -283,25 +210,19 @@ Please verify all information matches the original certificate.
 
 Processing Error Details: ${error.message}
 Timestamp: ${new Date().toISOString()}
-    `.trim();
+      `.trim();
 
-    return { extractedText: fallbackText, confidence: 40, method: 'image-ocr', pageCount: 1, processingTime, errors };
-  }
-};
+      return { extractedText: fallbackText, confidence: 40, method: 'image-ocr', pageCount: 1, processingTime, errors };
+    }
+  };
 
-
-  // Enhanced hash generation with validation
   const generateTextHash = async (text: string): Promise<string> => {
     try {
       if (!text || text.trim().length === 0) {
         throw new Error('Cannot generate hash from empty text');
       }
 
-      setProcessingProgress({
-        stage: 'Generating Hash',
-        progress: 80,
-        message: 'Creating SHA-256 hash...'
-      });
+      setCurrentStep('Generating SHA-256 hash...');
 
       const encoder = new TextEncoder();
       const data = encoder.encode(text.trim());
@@ -309,7 +230,6 @@ Timestamp: ${new Date().toISOString()}
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      // Validate hash format
       if (!/^[a-fA-F0-9]{64}$/.test(hash)) {
         throw new Error('Generated hash format is invalid');
       }
@@ -320,24 +240,15 @@ Timestamp: ${new Date().toISOString()}
     }
   };
 
-  // CORRECTED: Simplified QR code generation with only hash
   const generateQRCode = async (hash: string): Promise<string> => {
     try {
-      setProcessingProgress({
-        stage: 'Generating QR Code',
-        progress: 85,
-        message: 'Creating verification QR code...'
-      });
+      setCurrentStep('Creating verification QR code...');
 
-      // QR code now contains ONLY the hash
-      const qrContent = hash;
-      
-      // Validate hash format
       if (!/^[a-fA-F0-9]{64}$/.test(hash)) {
         throw new Error('Invalid hash format for QR code');
       }
 
-      const dataUrl = await QRCode.toDataURL(qrContent, { 
+      const dataUrl = await QRCode.toDataURL(hash, { 
         width: 200,
         margin: 2,
         color: {
@@ -353,19 +264,13 @@ Timestamp: ${new Date().toISOString()}
     }
   };
 
-  // CORRECTED: PDF modification with QR embedding in TOP-RIGHT corner
-  const embedQRInPDF = async (originalFile: File, qrDataUrl: string): Promise<string> => {
+  const embedQRInPDF = async (originalFile: File, qrDataUrl: string): Promise<Blob> => {
     try {
-      setProcessingProgress({
-        stage: 'Embedding QR Code',
-        progress: 90,
-        message: 'Adding QR code to PDF (top-right corner)...'
-      });
+      setCurrentStep('Embedding QR code in PDF...');
 
       const existingPdfBytes = await originalFile.arrayBuffer();
       const pdfDoc = await PDFDocument.load(existingPdfBytes);
 
-      // Convert data URL to bytes
       const base64Data = qrDataUrl.split(',')[1];
       if (!base64Data) {
         throw new Error('Invalid QR code data format');
@@ -382,121 +287,31 @@ Timestamp: ${new Date().toISOString()}
       const firstPage = pages[0];
       const { width, height } = firstPage.getSize();
 
-      // CORRECTED: Position QR code in TOP-RIGHT corner with margin
+      // Position QR code in TOP-RIGHT corner
       firstPage.drawImage(qrImage, {
-        x: width - 140, // 20px margin from right edge + 120px QR width
-        y: height - 140, // 20px margin from top + 120px QR height
+        x: width - 140,
+        y: height - 140,
         width: 120,
         height: 120,
       });
 
       const pdfBytes = await pdfDoc.save();
-
-      // Create blob with the Uint8Array
-      const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
-      return URL.createObjectURL(blob);
+      return new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
 
     } catch (error: any) {
       throw new Error(`PDF modification failed: ${error.message}`);
     }
   };
 
-  // Enhanced document processing pipeline
-  const processDocument = async () => {
-    if (!selectedFile) {
-      toast({
-        variant: "destructive",
-        title: "No File Selected",
-        description: "Please upload a PDF file first",
-      });
-      return;
-    }
-
-    // Validate file type
-    if (selectedFile.type !== 'application/pdf') {
-      toast({
-        variant: "destructive",
-        title: "Invalid File Type",
-        description: "Please upload a PDF file only",
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-    setProcessingErrors([]);
-    setProcessingSteps({
-      fileUploaded: true,
-      textExtracted: false,
-      hashGenerated: false,
-      qrGenerated: false,
-      qrEmbedded: false,
-      blockchainIssued: false
-    });
-
-    try {
-      // Step 1: Extract text using real OCR
-      toast({ title: "Processing Started", description: "Extracting text from PDF with OCR support..." });
-      const result = await extractTextFromPDF(selectedFile, form, setProcessingProgress);
-      
-      setExtractedText(result.extractedText);
-      setOcrResult(result);
-      setProcessingSteps(prev => ({ ...prev, textExtracted: true }));
-
-      if (result.errors && result.errors.length > 0) {
-        setProcessingErrors(result.errors);
-        toast({ 
-          variant: "destructive",
-          title: "Processing Warnings", 
-          description: `${result.errors.length} warnings occurred. Check details below.`
-        });
-      }
-
-      toast({ 
-        title: "Text Extraction Complete", 
-        description: `Method: ${result.method}, Confidence: ${result.confidence}%, Time: ${result.processingTime}ms` 
-      });
-
-      // Step 2: Generate hash from text
-      const hash = await generateTextHash(result.extractedText);
-      setTextHash(hash);
-      setProcessingSteps(prev => ({ ...prev, hashGenerated: true }));
-
-      // Step 3: Generate real QR code (only hash)
-      const qrDataUrl = await generateQRCode(hash);
-      setQrCodeDataUrl(qrDataUrl);
-      setProcessingSteps(prev => ({ ...prev, qrGenerated: true }));
-
-      // Step 4: Embed QR in PDF (top-right corner)
-      const processedPdfUrl = await embedQRInPDF(selectedFile, qrDataUrl);
-      setProcessedPdfUrl(processedPdfUrl);
-      setProcessingSteps(prev => ({ ...prev, qrEmbedded: true }));
-
-      setProcessingProgress({
-        stage: 'Complete',
-        progress: 100,
-        message: 'All processing completed successfully'
-      });
-
-      toast({
-        title: "Document Processed Successfully",
-        description: `Ready for blockchain issuance. OCR confidence: ${result.confidence}%`,
-      });
-
-    } catch (error: any) {
-      console.error("Document processing error:", error);
-      
-      const errorMessage = error.message || "Failed to process document";
-      setProcessingErrors(prev => [...prev, errorMessage]);
-      
-      toast({
-        variant: "destructive",
-        title: "Processing Failed",
-        description: errorMessage,
-      });
-    } finally {
-      setIsProcessing(false);
-      setProcessingProgress(null);
-    }
+  const downloadFile = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const stringToBytes32 = (str: string): string => {
@@ -507,27 +322,150 @@ Timestamp: ${new Date().toISOString()}
     return '0x' + cleanStr;
   };
 
-  // Enhanced blockchain issuing with better error handling
   const handleIssueCertificate = async () => {
-    if (!textHash || !web3State.contract || !web3State.account) {
+    if (!selectedFile || !web3State.contract || !web3State.account) {
       toast({
         variant: "destructive",
-        title: "Not Ready",
-        description: "Please process the document first and connect your wallet",
+        title: "Requirements Not Met",
+        description: "Please upload a PDF file and connect your wallet",
+      });
+      return;
+    }
+
+    // Validate form
+    if (!form.studentName.trim() || !form.rollNumber.trim() || !form.course.trim() || !form.institution.trim() || !form.dateIssued) {
+      toast({
+        variant: "destructive",
+        title: "Form Incomplete",
+        description: "Please fill in all required fields",
       });
       return;
     }
 
     setIsIssuing(true);
+    let textHash = '';
+
     try {
+      // Step 1: Process document with OCR
+      toast({ title: "Processing Started", description: "Extracting text from PDF..." });
+      
+      const ocrResult = await extractTextFromPDF(selectedFile, form);
+      
+      toast({ 
+        title: "Text Extraction Complete", 
+        description: `Method: ${ocrResult.method}, Confidence: ${ocrResult.confidence}%` 
+      });
+
+      // Step 2: Generate hash
+      textHash = await generateTextHash(ocrResult.extractedText);
+
+      // Step 3: Generate QR code
+      const qrDataUrl = await generateQRCode(textHash);
+
+      // Step 4: Create PDF with embedded QR
+      const processedPdfBlob = await embedQRInPDF(selectedFile, qrDataUrl);
+
+      // Step 5: Automatic downloads
+      setCurrentStep('Preparing downloads...');
+      
+      // Download processed PDF
+      downloadFile(processedPdfBlob, `${form.studentName.replace(/\s+/g, '_')}_certificate_with_qr.pdf`);
+      
+      // Download QR code as image
+      const qrBlob = await fetch(qrDataUrl).then(res => res.blob());
+      downloadFile(qrBlob, `${form.studentName.replace(/\s+/g, '_')}_verification_qr.png`);
+
+      // Download text file with hash
+      const hashContent = `Certificate Hash Verification
+      
+Student: ${form.studentName}
+Roll Number: ${form.rollNumber}
+Course: ${form.course}
+Institution: ${form.institution}
+Date Issued: ${form.dateIssued}
+
+Document Hash (SHA-256):
+${textHash}
+
+OCR Details:
+- Method: ${ocrResult.method}
+- Confidence: ${ocrResult.confidence}%
+- Pages Processed: ${ocrResult.pageCount}
+- Processing Time: ${ocrResult.processingTime}ms
+
+Generated on: ${new Date().toISOString()}
+      `;
+      
+      const hashBlob = new Blob([hashContent], { type: 'text/plain' });
+      downloadFile(hashBlob, `${form.studentName.replace(/\s+/g, '_')}_hash_verification.txt`);
+
+      toast({
+        title: "Files Downloaded",
+        description: "PDF with QR, QR image, and hash verification file downloaded",
+      });
+
+      // Step 6: Validate contract before blockchain transaction
+      setCurrentStep('Validating smart contract...');
+      
+      // Check if contract has the expected function
+      if (!web3State.contract.issueCertificate) {
+        throw new Error("Contract does not have issueCertificate function. Please check contract deployment.");
+      }
+
+      // Validate contract address
+      const contractCode = await web3State.provider?.getCode(web3State.contract.target || web3State.contract.address);
+      if (!contractCode || contractCode === '0x') {
+        throw new Error("No contract found at the specified address. Please check contract deployment.");
+      }
+
+      // Prepare transaction parameters with validation
       const dateTimestamp = Math.floor(new Date(form.dateIssued).getTime() / 1000);
       const bytes32Hash = stringToBytes32(textHash);
 
+      // Log parameters for debugging
+      console.log('Contract parameters:', {
+        rollNumber: form.rollNumber,
+        studentName: form.studentName,
+        course: form.course,
+        institution: form.institution,
+        dateTimestamp,
+        bytes32Hash,
+        contractAddress: web3State.contract.target || web3State.contract.address
+      });
+
+      // Step 7: Issue on blockchain with enhanced error handling
+      setCurrentStep('Issuing certificate on blockchain...');
+
       toast({
-        title: "Submitting Transaction",
+        title: "Blockchain Transaction",
         description: "Please confirm the transaction in your wallet...",
       });
 
+      // Try to estimate gas first to catch errors early
+      try {
+        const gasEstimate = await web3State.contract.issueCertificate.estimateGas(
+          form.rollNumber,
+          form.studentName,
+          form.course,
+          form.institution,
+          dateTimestamp,
+          bytes32Hash
+        );
+        console.log('Gas estimate:', gasEstimate.toString());
+      } catch (gasError: any) {
+        console.error('Gas estimation failed:', gasError);
+        
+        // Provide more specific error messages
+        if (gasError.message.includes('missing revert data')) {
+          throw new Error("Contract function call failed. This might be due to: 1) Contract not deployed correctly, 2) Function signature mismatch, 3) Invalid parameters, or 4) Contract access restrictions.");
+        } else if (gasError.message.includes('revert')) {
+          throw new Error("Transaction would fail with revert. Check contract conditions and parameters.");
+        } else {
+          throw new Error(`Gas estimation failed: ${gasError.message}`);
+        }
+      }
+
+      // Execute the transaction
       const tx = await web3State.contract.issueCertificate(
         form.rollNumber,
         form.studentName,
@@ -544,7 +482,7 @@ Timestamp: ${new Date().toISOString()}
 
       const receipt = await tx.wait();
 
-      // Extract certificate ID from events with enhanced error handling
+      // Extract certificate ID from events
       let blockchainCertificateId = 'Unknown';
       try {
         const certificateEvent = receipt.logs?.find((log: any) => {
@@ -571,7 +509,7 @@ Timestamp: ${new Date().toISOString()}
         ? blockchainCertificateId 
         : `${Date.now()}-${crypto.randomUUID()}`;
 
-      // Save to database with error handling
+      // Save to database
       const { error: insertError } = await supabase
         .from("issued_certificates")
         .insert({
@@ -594,7 +532,6 @@ Timestamp: ${new Date().toISOString()}
           description: "Certificate issued on blockchain but failed to save to database. Please contact support.",
         });
       } else {
-        setProcessingSteps(prev => ({ ...prev, blockchainIssued: true }));
         setIssuedTxHash(receipt.transactionHash);
         setIssuedCertificateId(certificateIdToStore);
         
@@ -611,31 +548,18 @@ Timestamp: ${new Date().toISOString()}
             course: '',
             institution: '',
             dateIssued: new Date().toISOString().split('T')[0],
-            certificateId: '',
-            description: ''
+            certificateId: ''
           });
           setSelectedFile(null);
-          setExtractedText('');
-          setOcrResult(null);
-          setTextHash('');
-          setQrCodeDataUrl('');
-          setProcessedPdfUrl('');
-          setProcessingErrors([]);
-          setProcessingSteps({
-            fileUploaded: false,
-            textExtracted: false,
-            hashGenerated: false,
-            qrGenerated: false,
-            qrEmbedded: false,
-            blockchainIssued: false
-          });
-        }, 5000); // Reset after 5 seconds
+          setIssuedTxHash(null);
+          setIssuedCertificateId(null);
+        }, 10000); // Reset after 10 seconds
       }
 
     } catch (error: any) {
-      console.error("Issue certificate error:", error);
+      console.error("Certificate issuance error:", error);
       
-      let errorMessage = "Failed to issue certificate. Please try again.";
+      let errorMessage = "Failed to process and issue certificate. Please try again.";
       
       if (error.message?.includes("no matching fragment")) {
         errorMessage = "Contract method signature mismatch. Please check your contract.";
@@ -656,19 +580,8 @@ Timestamp: ${new Date().toISOString()}
       });
     } finally {
       setIsIssuing(false);
+      setCurrentStep('');
     }
-  };
-
-  const validateForm = (): boolean => {
-    return !!(
-      selectedFile &&
-      form.studentName.trim() &&
-      form.rollNumber.trim() &&
-      form.course.trim() &&
-      form.institution.trim() &&
-      form.dateIssued &&
-      web3State.isConnected
-    );
   };
 
   return (
@@ -676,9 +589,9 @@ Timestamp: ${new Date().toISOString()}
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-foreground">Advanced OCR Certificate Issuer</h1>
+          <h1 className="text-4xl font-bold text-foreground">Certificate Issuer</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Extract text from any PDF (including image-based), generate secure hash, embed QR code at top-right, and register on blockchain
+            Upload PDF, automatically extract text with OCR, generate verification files, and issue on blockchain
           </p>
         </div>
 
@@ -686,47 +599,6 @@ Timestamp: ${new Date().toISOString()}
         <div className="flex justify-center">
           <WalletConnect web3State={web3State} onConnect={setWeb3State} />
         </div>
-
-        {/* Processing Steps */}
-        <Card className="bg-muted/30">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">OCR Processing Pipeline</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4">
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm ${
-                processingSteps.textExtracted ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
-              } border`}>
-                <Image className="w-4 h-4" />
-                OCR Extract
-              </div>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm ${
-                processingSteps.hashGenerated ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
-              } border`}>
-                <Hash className="w-4 h-4" />
-                Hash Generated
-              </div>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm ${
-                processingSteps.qrGenerated ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
-              } border`}>
-                <QrCode className="w-4 h-4" />
-                QR Generated (Hash Only)
-              </div>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm ${
-                processingSteps.qrEmbedded ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
-              } border`}>
-                <FileCheck className="w-4 h-4" />
-                QR Embedded (Top-Right)
-              </div>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm ${
-                processingSteps.blockchainIssued ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
-              } border`}>
-                <ExternalLink className="w-4 h-4" />
-                Blockchain Issued
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Form */}
         <Card className="shadow-lg border-0 bg-card/50 backdrop-blur">
@@ -736,12 +608,12 @@ Timestamp: ${new Date().toISOString()}
               Certificate Details
             </CardTitle>
             <CardDescription>
-              Fill in certificate information - OCR will extract and verify text from uploaded PDF
+              Fill in certificate information and upload PDF. Processing and blockchain issuance will happen automatically.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="certificate-file">Certificate Document (PDF)</Label>
+              <Label htmlFor="certificate-file">Certificate Document (PDF) *</Label>
               <FileUpload onFileSelect={setSelectedFile} selectedFile={selectedFile} />
               {selectedFile && (
                 <p className="text-sm text-muted-foreground">
@@ -788,7 +660,7 @@ Timestamp: ${new Date().toISOString()}
                 />
               </div>
               <div className="space-y-2">
-                 <Label htmlFor="date-issued">Date Issued *</Label>
+                <Label htmlFor="date-issued">Date Issued *</Label>
                 <Input 
                   id="date-issued" 
                   type="date" 
@@ -798,7 +670,7 @@ Timestamp: ${new Date().toISOString()}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="certificate-id">Certificate ID (Reference)</Label>
+                <Label htmlFor="certificate-id">Certificate ID (Optional)</Label>
                 <Input 
                   id="certificate-id" 
                   placeholder="Optional reference ID" 
@@ -810,237 +682,26 @@ Timestamp: ${new Date().toISOString()}
 
             <div className="space-y-4">
               <Button 
-                onClick={processDocument} 
-                disabled={!selectedFile || isProcessing} 
-                size="lg" 
-                className="w-full"
-                variant="outline"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Processing Document (OCR Active)...
-                  </>
-                ) : (
-                  <>
-                    <Image className="w-4 h-4 mr-2" />
-                    Process Document with OCR
-                  </>
-                )}
-              </Button>
-
-              <Button 
                 onClick={handleIssueCertificate} 
-                disabled={!validateForm() || !textHash || isIssuing} 
+                disabled={!selectedFile || !form.studentName.trim() || !form.rollNumber.trim() || !form.course.trim() || !form.institution.trim() || !form.dateIssued || !web3State.isConnected || isIssuing} 
                 size="lg" 
                 className="w-full"
               >
                 {isIssuing ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Issuing Certificate...
+                    {currentStep || 'Processing...'}
                   </>
                 ) : (
                   <>
                     <FileCheck className="w-4 h-4 mr-2" />
-                    Issue Certificate on Blockchain
+                    Process & Issue Certificate
                   </>
                 )}
               </Button>
             </div>
           </CardContent>
         </Card>
-
-        {/* OCR Results Display */}
-        {ocrResult && (
-          <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                <Eye className="w-5 h-5" />
-                OCR Processing Results
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div className="bg-white dark:bg-gray-800 p-3 rounded">
-                  <div className="text-sm text-muted-foreground">Extraction Method</div>
-                  <div className="font-medium capitalize">{ocrResult.method.replace('-', ' ')}</div>
-                </div>
-                <div className="bg-white dark:bg-gray-800 p-3 rounded">
-                  <div className="text-sm text-muted-foreground">Confidence Score</div>
-                  <div className="font-medium">{ocrResult.confidence}%</div>
-                </div>
-                <div className="bg-white dark:bg-gray-800 p-3 rounded">
-                  <div className="text-sm text-muted-foreground">Pages Processed</div>
-                  <div className="font-medium">{ocrResult.pageCount}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Processing Errors Display */}
-        {processingErrors.length > 0 && (
-          <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-yellow-700 dark:text-yellow-300">
-                <AlertTriangle className="w-5 h-5" />
-                Processing Warnings ({processingErrors.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {processingErrors.map((error, index) => (
-                  <div key={index} className="text-sm text-yellow-700 dark:text-yellow-300 bg-white dark:bg-gray-800 p-2 rounded">
-                    {error}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Processing Progress Display */}
-        {processingProgress && (
-          <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20">
-            <CardContent className="pt-6">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                    {processingProgress.stage}
-                  </span>
-                  <span className="text-sm text-blue-600 dark:text-blue-400">
-                    {processingProgress.progress}%
-                  </span>
-                </div>
-                <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-2">
-                  <div 
-                    className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${processingProgress.progress}%` }}
-                  ></div>
-                </div>
-                <p className="text-xs text-blue-600 dark:text-blue-400">
-                  {processingProgress.message}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Extracted Text Display */}
-        {extractedText && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Extracted Text Content
-                {ocrResult && (
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    ocrResult.confidence >= 90 ? 'bg-green-100 text-green-700' :
-                    ocrResult.confidence >= 80 ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {ocrResult.confidence}% confidence
-                  </span>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-muted p-4 rounded-lg">
-                <pre className="text-sm whitespace-pre-wrap max-h-80 overflow-y-auto font-mono">
-                  {extractedText}
-                </pre>
-              </div>
-              <div className="mt-3 text-sm text-muted-foreground">
-                Character count: {extractedText.length} | Word count: {extractedText.split(/\s+/).length}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Document Hash Display */}
-        {textHash && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Hash className="w-5 h-5" />
-                Document Hash (SHA-256)
-              </CardTitle>
-              <CardDescription>
-                This hash uniquely identifies the extracted text content
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-muted p-3 rounded-lg">
-                <code className="text-sm break-all font-mono">
-                  {textHash}
-                </code>
-              </div>
-              <div className="mt-2 text-xs text-muted-foreground">
-                Hash length: 64 characters (256 bits)
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* QR Code Display */}
-        {qrCodeDataUrl && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <QrCode className="w-5 h-5" />
-                Verification QR Code
-              </CardTitle>
-              <CardDescription>
-                Contains only the SHA-256 hash for simple verification
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center space-y-4">
-                <div className="p-4 bg-white rounded-lg border-2 border-dashed border-gray-300">
-                  <img src={qrCodeDataUrl} alt="Verification QR Code" className="w-32 h-32" />
-                </div>
-                <div className="text-center space-y-2">
-                  <div className="text-sm font-medium">QR Code Position: Top-Right Corner</div>
-                  <div className="text-xs text-muted-foreground">
-                    Will be embedded at top-right with 20px margin and 120px size
-                  </div>
-                  <div className="text-xs text-gray-600 bg-gray-100 dark:bg-gray-800 p-2 rounded">
-                    <strong>QR Content:</strong> Hash only ({textHash.substring(0, 16)}...)
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Processed PDF Download */}
-        {processedPdfUrl && (
-          <Card className="border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950/20">
-            <CardContent className="pt-6 text-center space-y-4">
-              <div className="w-16 h-16 bg-purple-500 text-white rounded-full flex items-center justify-center mx-auto">
-                <FileCheck className="w-8 h-8" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-purple-700 dark:text-purple-300">
-                  PDF with QR Code Ready
-                </h3>
-                <p className="text-sm text-purple-600 dark:text-purple-400">
-                  QR code (hash only) embedded at top-right corner for verification
-                </p>
-              </div>
-              <Button 
-                asChild 
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                <a href={processedPdfUrl} download="certificate-with-hash-qr.pdf">
-                  <FileCheck className="w-4 h-4 mr-2" />
-                  Download PDF with Hash QR Code
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Success Card */}
         {issuedTxHash && (
@@ -1053,6 +714,9 @@ Timestamp: ${new Date().toISOString()}
                 <h3 className="text-xl font-semibold text-green-700 dark:text-green-300">
                   Certificate Issued Successfully!
                 </h3>
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  Files have been automatically downloaded and certificate is recorded on blockchain
+                </p>
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div className="bg-white dark:bg-gray-800 p-3 rounded">
@@ -1062,16 +726,6 @@ Timestamp: ${new Date().toISOString()}
                     <div className="bg-white dark:bg-gray-800 p-3 rounded">
                       <div className="text-muted-foreground">Certificate ID</div>
                       <code className="text-sm">{issuedCertificateId}</code>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 p-3 rounded">
-                      <div className="text-muted-foreground">Document Hash</div>
-                      <code className="text-xs break-all">{textHash}</code>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 p-3 rounded">
-                      <div className="text-muted-foreground">OCR Method</div>
-                      <span className="text-sm capitalize">
-                        {ocrResult?.method.replace('-', ' ') || 'Standard'}
-                      </span>
                     </div>
                   </div>
                 </div>
