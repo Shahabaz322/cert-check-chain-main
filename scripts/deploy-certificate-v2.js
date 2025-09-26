@@ -1,134 +1,153 @@
-const hre = require("hardhat");
+const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
 async function main() {
+  console.log("🚀 Starting Enhanced CertificateContract deployment...");
+  
+  // Get network info
+  const network = await ethers.provider.getNetwork();
+  console.log(`🌐 Connected to network: ${network.name} Chain ID: ${network.chainId}`);
+  
+  // Get deployer account
+  const [deployer] = await ethers.getSigners();
+  console.log(`👤 Deploying with account: ${deployer.address}`);
+  
+  const balance = await ethers.provider.getBalance(deployer.address);
+  console.log(`💰 Account balance: ${ethers.formatEther(balance)} ETH`);
+  
   try {
-    console.log("🚀 Starting CertificateContract deployment...");
+    console.log("📋 Getting contract factory...");
     
-    // Check network
-    const network = await hre.ethers.provider.getNetwork();
-    console.log("🌐 Connected to network:", network.name, "Chain ID:", network.chainId.toString());
-    
-    // Get signers
-    const [deployer] = await hre.ethers.getSigners();
-    console.log("👤 Deploying with account:", deployer.address);
-    
-    // Get balance
-    const balance = await hre.ethers.provider.getBalance(deployer.address);
-    console.log("💰 Account balance:", hre.ethers.formatEther(balance), "ETH");
-    
-    // FIXED: Use the correct fully qualified name based on the diagnostics
-    console.log("\n📋 Getting contract factory...");
-    console.log("📋 Using contract: contracts/CertificateV2.sol:CertificateContract");
-    const CertificateContract = await hre.ethers.getContractFactory("contracts/CertificateV2.sol:CertificateContract");
-
+    // FIXED: Use the correct contract name
+    const contractFactory = await ethers.getContractFactory("EnhancedCertificateContract");
+    console.log("📋 Using contract: contracts/CertificateV2.sol:EnhancedCertificateContract");
     
     console.log("🚀 Deploying contract...");
-    const certificateContract = await CertificateContract.deploy();
-
-    console.log("⏳ Waiting for deployment confirmation...");
-    await certificateContract.waitForDeployment();
+    const contract = await contractFactory.deploy();
     
-    // Get contract address (ethers v6 compatible)
-    const contractAddress = await certificateContract.getAddress();
+    console.log("⏳ Waiting for deployment confirmation...");
+    await contract.waitForDeployment();
+    
+    const contractAddress = await contract.getAddress();
     console.log("✅ Contract deployed successfully!");
-    console.log("📍 Contract Address:", contractAddress);
+    console.log(`📍 Contract Address: ${contractAddress}`);
     
     // Verify deployment
-    const deployedCode = await hre.ethers.provider.getCode(contractAddress);
-    console.log("🔍 Contract code length:", deployedCode.length, "characters");
-    console.log("✅ Deployment verified:", deployedCode !== "0x");
+    const deployedCode = await ethers.provider.getCode(contractAddress);
+    console.log(`🔍 Contract code length: ${deployedCode.length} characters`);
+    console.log(`✅ Deployment verified: ${deployedCode !== "0x"}`);
     
-    // Load artifact - FIXED: Use correct path and filename
-    console.log("\n📁 Loading contract artifact...");
-    const artifactPath = path.join(__dirname, "..", "artifacts", "contracts", "CertificateV2.sol", "CertificateContract.json");
-
+    // Load and verify artifact - FIXED: Use correct artifact path
+    const artifactPath = path.join(
+      __dirname,
+      "../artifacts/contracts/CertificateV2.sol/EnhancedCertificateContract.json"
+    );
+    
+    console.log("📁 Loading contract artifact...");
     
     if (!fs.existsSync(artifactPath)) {
-      throw new Error(`Artifact not found at: ${artifactPath}\nRun 'npx hardhat compile' first.`);
+      console.log("❌ DEPLOYMENT FAILED:");
+      console.log(`Error message: Artifact not found at: ${artifactPath}`);
+      console.log("Run 'npx hardhat compile' first.");
+      console.log("📋 Solution: Run 'npx hardhat compile' first");
+      return;
     }
     
     const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
-    console.log("📋 Contract name:", artifact.contractName);
-    console.log("📋 ABI functions:", artifact.abi.length);
-    
-    // Create output directory
-    console.log("\n📁 Preparing output directory...");
-    const outputDir = path.join(__dirname, "..", "src", "lib");
-    
-    if (!fs.existsSync(outputDir)) {
-      console.log("📁 Creating directory:", outputDir);
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
+    console.log(`📋 Contract name: ${artifact.contractName}`);
+    console.log(`📋 Compiler version: ${artifact.metadata ? JSON.parse(artifact.metadata).compiler.version : 'Unknown'}`);
     
     // Test basic contract functionality
-    console.log("\n🧪 Testing contract functionality...");
+    console.log("🧪 Testing basic contract functions...");
+    
     try {
-      const owner = await certificateContract.owner();
-      const totalCertificates = await certificateContract.getTotalCertificates();
-      const nextId = await certificateContract.nextCertificateId();
+      const owner = await contract.owner();
+      console.log(`👤 Contract owner: ${owner}`);
       
-      console.log("✅ Contract owner:", owner);
-      console.log("✅ Total certificates:", totalCertificates.toString());
-      console.log("✅ Next certificate ID:", nextId.toString());
+      const stats = await contract.getContractStats();
+      console.log(`📊 Contract stats - Total certs: ${stats[0]}, Total institutions: ${stats[1]}`);
+      
+      // Test institution info (owner should be registered as admin)
+      const ownerInstitution = await contract.getInstitutionInfo(deployer.address);
+      console.log(`🏢 Owner institution: ${ownerInstitution.name}`);
+      
+      console.log("✅ Contract functionality verified!");
+      
     } catch (testError) {
-      console.log("⚠️  Warning: Could not test contract functions:", testError.message);
+      console.log("⚠️  Contract deployed but functionality test failed:");
+      console.log(testError.message);
     }
     
-    // Prepare contract configuration
-    const contractConfig = {
-      address: contractAddress,
-      abi: artifact.abi,
-      contractName: "CertificateContract",
-      sourceName: artifact.sourceName,
-      deploymentInfo: {
-        deployer: deployer.address,
-        network: network.name,
-        chainId: network.chainId.toString(),
-        timestamp: new Date().toISOString(),
-        blockNumber: await hre.ethers.provider.getBlockNumber()
-      }
+    // Save deployment info
+    const deploymentInfo = {
+      contractAddress: contractAddress,
+      deployerAddress: deployer.address,
+      networkName: network.name,
+      chainId: network.chainId.toString(),
+      deploymentTimestamp: new Date().toISOString(),
+      contractName: "EnhancedCertificateContract",
+      artifactPath: "contracts/CertificateV2.sol:EnhancedCertificateContract"
     };
     
-    // Save configuration
-    const configPath = path.join(outputDir, "contract-config.json");
-    fs.writeFileSync(configPath, JSON.stringify(contractConfig, null, 2));
-    
-    console.log("💾 Configuration saved to:", configPath);
-    
-    // Verify saved file
-    if (fs.existsSync(configPath)) {
-      const fileSize = fs.statSync(configPath).size;
-      const savedConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
-      
-      console.log("✅ File verification:");
-      console.log("   📊 File size:", fileSize, "bytes");
-      console.log("   📍 Saved address:", savedConfig.address);
-      console.log("   📋 Saved ABI functions:", savedConfig.abi.length);
-      console.log("   🌐 Saved network:", savedConfig.deploymentInfo.network);
+    // Create deployments directory if it doesn't exist
+    const deploymentsDir = path.join(__dirname, "../deployments");
+    if (!fs.existsSync(deploymentsDir)) {
+      fs.mkdirSync(deploymentsDir, { recursive: true });
     }
     
+    // Save deployment info
+    const deploymentFile = path.join(deploymentsDir, `enhanced-certificate-${network.name}-${Date.now()}.json`);
+    fs.writeFileSync(deploymentFile, JSON.stringify(deploymentInfo, null, 2));
+    console.log(`📝 Deployment info saved to: ${deploymentFile}`);
+    
+    // Update contract config for frontend
+    const contractConfigPath = path.join(__dirname, "../src/lib/contract-config.json");
+    let contractConfig = {};
+    
+    try {
+      if (fs.existsSync(contractConfigPath)) {
+        contractConfig = JSON.parse(fs.readFileSync(contractConfigPath, "utf8"));
+      }
+    } catch (error) {
+      console.log("⚠️  Could not read existing contract config, creating new one");
+    }
+    
+    contractConfig.enhancedCertificate = {
+      address: contractAddress,
+      network: network.name,
+      chainId: network.chainId.toString(),
+      deployedAt: new Date().toISOString()
+    };
+    
+    fs.writeFileSync(contractConfigPath, JSON.stringify(contractConfig, null, 2));
+    console.log(`📝 Contract config updated at: ${contractConfigPath}`);
+    
     console.log("\n🎉 DEPLOYMENT COMPLETED SUCCESSFULLY!");
-    console.log("📍 Contract Address:", contractAddress);
-    console.log("📁 Config File:", configPath);
-    console.log("🌐 Network:", network.name);
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log(`📍 Contract Address: ${contractAddress}`);
+    console.log(`🌐 Network: ${network.name} (Chain ID: ${network.chainId})`);
+    console.log(`👤 Deployed by: ${deployer.address}`);
+    console.log(`💰 Gas used: Check transaction details`);
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    console.log("\n📋 Next steps:");
+    console.log("1. Update your frontend to use the new contract address");
+    console.log("2. Register additional institutions if needed");
+    console.log("3. Test certificate issuance and verification");
     
   } catch (error) {
-    console.error("\n❌ DEPLOYMENT FAILED:");
+    console.error("❌ DEPLOYMENT FAILED:");
     console.error("Error message:", error.message);
     
-    if (error.message.includes("insufficient funds")) {
-      console.error("💰 Solution: Fund your account with test ETH");
-    } else if (error.message.includes("network")) {
-      console.error("🌐 Solution: Check your network configuration");
-    } else if (error.message.includes("compile")) {
-      console.error("📋 Solution: Run 'npx hardhat compile' first");
-    } else if (error.message.includes("Artifact")) {
-      console.error("📋 Solutions:");
-      console.error("1. The contract name inside CertificateV2.sol should match what you're trying to deploy");
-      console.error("2. Run 'npx hardhat clean' then 'npx hardhat compile'");
-      console.error("3. Check the contract name inside the .sol file");
+    if (error.code === "INSUFFICIENT_FUNDS") {
+      console.log("💡 Solution: Add more ETH to your deployer account");
+    } else if (error.code === "NETWORK_ERROR") {
+      console.log("💡 Solution: Check your network connection and RPC endpoint");
+    } else if (error.message.includes("revert")) {
+      console.log("💡 Solution: Check contract constructor requirements");
+    } else {
+      console.log("💡 Solution: Check the error details above and contract code");
     }
     
     process.exit(1);
@@ -138,6 +157,6 @@ async function main() {
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error("💥 Unhandled error:", error);
+    console.error("❌ Unexpected error:", error);
     process.exit(1);
   });

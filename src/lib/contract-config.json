@@ -628,5 +628,11 @@
     "chainId": "1337",
     "timestamp": "2025-09-22T05:52:04.035Z",
     "blockNumber": 64
+  },
+  "enhancedCertificate": {
+    "address": "0x509fae42AEb1fC810922EEFad7F7E2a41FCdD8fd",
+    "network": "ganache",
+    "chainId": "1337",
+    "deployedAt": "2025-09-26T06:34:31.928Z"
   }
 }

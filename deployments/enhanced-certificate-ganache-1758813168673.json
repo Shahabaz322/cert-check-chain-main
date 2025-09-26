@@ -1,0 +1,9 @@
+{
+  "contractAddress": "0xf72E5b1cEc727129CDD6a565Ff11Bf0115B9104f",
+  "deployerAddress": "0x4d4ea9a2980CF5c159933Fa025E98eA2359E5f3E",
+  "networkName": "ganache",
+  "chainId": "1337",
+  "deploymentTimestamp": "2025-09-25T15:12:48.673Z",
+  "contractName": "EnhancedCertificateContract",
+  "artifactPath": "contracts/CertificateV2.sol:EnhancedCertificateContract"
+}

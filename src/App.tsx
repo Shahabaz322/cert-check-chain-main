@@ -8,6 +8,8 @@ import Home from "./pages/Home";
 import IssueCertificate from "./pages/IssueCertificate";
 import VerifyCertificate from "./pages/VerifyCertificate";
 import NotFound from "./pages/NotFound";
+// import EnhancedIssueCertificate from "./pages/IssueCertificate";
+// import EnhancedVerifyCertificate from "./pages/VerifyCertificate";
 
 const queryClient = new QueryClient();
 
