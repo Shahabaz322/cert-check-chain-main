@@ -102,5 +102,21 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
     "vite": "^5.4.19"
-  }
+  },
+  "description": "![License](https://img.shields.io/badge/license-MIT-blue.svg)\r ![Node Version](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)\r ![React](https://img.shields.io/badge/React-18.x-blue.svg)\r ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)",
+  "main": "eslint.config.js",
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shahabaz322/cert-check-chain-main.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Shahabaz322/cert-check-chain-main/issues"
+  },
+  "homepage": "https://github.com/Shahabaz322/cert-check-chain-main#readme"
 }
