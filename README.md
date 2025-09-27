@@ -184,15 +184,22 @@ If you encounter any issues or have questions:
 
 **Made with ❤️ for secure certificate verification**
 ```
+
+```
+
+```
 cert-check-chain-main
 ├─ .env
 ├─ bun.lockb
 ├─ components.json
 ├─ contracts
-│  ├─ CerificateV2.sol
 │  ├─ Certificate.sol
 │  ├─ CertificateContract.sol
+│  ├─ CertificateV2.sol
 │  └─ Counter.sol
+├─ deployments
+│  ├─ enhanced-certificate-ganache-1758730612232.json
+│  └─ enhanced-certificate-ganache-1758813168673.json
 ├─ eslint.config.js
 ├─ hardhat.config.ts
 ├─ hardhat.tsconfig.json
@@ -215,6 +222,7 @@ cert-check-chain-main
 │  ├─ deploy-simple.js
 │  ├─ deploy.ts
 │  ├─ send-op-tx.ts
+│  ├─ simple-deploy.js
 │  ├─ test-connection.js
 │  └─ verify-certificate-deployment.ts
 ├─ src
@@ -311,23 +319,23 @@ cert-check-chain-main
 ├─ tsconfig.json
 ├─ tsconfig.node.json
 ├─ typechain-types
-│  ├─ CerificateV2.sol
-│  │  ├─ CertificateContract.ts
-│  │  └─ index.ts
 │  ├─ Certificate.sol
 │  │  ├─ CertificateContract.ts
 │  │  └─ index.ts
 │  ├─ CertificateContract.ts
+│  ├─ CertificateV2.sol
+│  │  ├─ EnhancedCertificateContract.ts
+│  │  └─ index.ts
 │  ├─ common.ts
 │  ├─ Counter.ts
 │  ├─ factories
-│  │  ├─ CerificateV2.sol
-│  │  │  ├─ CertificateContract__factory.ts
-│  │  │  └─ index.ts
 │  │  ├─ Certificate.sol
 │  │  │  ├─ CertificateContract__factory.ts
 │  │  │  └─ index.ts
 │  │  ├─ CertificateContract__factory.ts
+│  │  ├─ CertificateV2.sol
+│  │  │  ├─ EnhancedCertificateContract__factory.ts
+│  │  │  └─ index.ts
 │  │  ├─ Counter__factory.ts
 │  │  └─ index.ts
 │  ├─ hardhat.d.ts

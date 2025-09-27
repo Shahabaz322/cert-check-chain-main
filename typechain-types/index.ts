@@ -10,4 +10,6 @@ export type { Counter } from "./Counter";
 export * as factories from "./factories";
 export type { CertificateContract } from "./Certificate.sol/CertificateContract";
 export { CertificateContract__factory } from "./factories/Certificate.sol/CertificateContract__factory";
+export type { EnhancedCertificateContract } from "./CertificateV2.sol/EnhancedCertificateContract";
+export { EnhancedCertificateContract__factory } from "./factories/CertificateV2.sol/EnhancedCertificateContract__factory";
 export { Counter__factory } from "./factories/Counter__factory";

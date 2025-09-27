@@ -2,3 +2,4 @@
 /* tslint:disable */
 /* eslint-disable */
 export { CertificateContract__factory } from "./CertificateContract__factory";
+export { EnhancedCertificateContract__factory } from "./EnhancedCertificateContract__factory";

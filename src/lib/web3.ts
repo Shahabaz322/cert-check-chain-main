@@ -4,7 +4,7 @@ const INFURA_API_KEY = import.meta.env.VITE_INFURA_API_KEY;
 
 // Replace these in your src/lib/web3.ts file after deployment:
 
-export const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'; // From deployment output
+export const CONTRACT_ADDRESS = '0xe5e749803f7F98F0F60e24aa631576F33f9fbE5a'; // From deployment output
 
 export const CONTRACT_ABI = [
     {

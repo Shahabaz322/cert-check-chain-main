@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@ethersproject/bytes": "^5.8.0",
+    "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -46,7 +47,7 @@
     "@radix-ui/react-toggle": "^1.1.9",
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
-    "@supabase/supabase-js": "^2.57.0",
+    "@supabase/supabase-js": "^2.58.0",
     "@tanstack/react-query": "^5.83.0",
     "@types/crypto-js": "^4.2.2",
     "class-variance-authority": "^0.7.1",
@@ -56,8 +57,13 @@
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
+    "jsqr": "^1.4.0",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^3.11.174",
+    "qr-scanner": "^1.4.2",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
@@ -69,6 +75,7 @@
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
+    "tesseract.js": "^6.0.1",
     "vaul": "^0.9.9",
     "zod": "^3.25.76"
   },
@@ -78,6 +85,7 @@
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22.16.5",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
@@ -94,5 +102,21 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
     "vite": "^5.4.19"
-  }
+  },
+  "description": "![License](https://img.shields.io/badge/license-MIT-blue.svg)\r ![Node Version](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)\r ![React](https://img.shields.io/badge/React-18.x-blue.svg)\r ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)",
+  "main": "eslint.config.js",
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shahabaz322/cert-check-chain-main.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Shahabaz322/cert-check-chain-main/issues"
+  },
+  "homepage": "https://github.com/Shahabaz322/cert-check-chain-main#readme"
 }

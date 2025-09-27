@@ -2,3 +2,4 @@
 /* tslint:disable */
 /* eslint-disable */
 export type { CertificateContract } from "./CertificateContract";
+export type { EnhancedCertificateContract } from "./EnhancedCertificateContract";
